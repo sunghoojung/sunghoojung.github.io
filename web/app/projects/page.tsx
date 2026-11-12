@@ -13,28 +13,43 @@ export default function ProjectsPage() {
   return (
     <SiteShell current="/projects">
       <h1>Projects</h1>
-      {projects.map((project) => (
-        <article
-          className="entry"
-          id={project.id}
-          key={project.id}
-          aria-labelledby={`${project.id}-title`}
-        >
-          <h2 className="entry-title" id={`${project.id}-title`}>
-            {project.title}
-          </h2>
-          <p className="meta">{project.context}</p>
-          <p>{project.description}</p>
-          <p className="meta entry-footer">
-            <span>{project.stack.join(", ")}</span>
-            {project.links.map((link) => (
-              <ExternalLink href={link.href} key={link.href}>
-                {link.label}
-              </ExternalLink>
-            ))}
-          </p>
-        </article>
-      ))}
+      <div className="projects">
+        {projects.map((project, index) => (
+          <article
+            className="project"
+            id={project.id}
+            key={project.id}
+            aria-labelledby={`${project.id}-title`}
+          >
+            <img
+              className="project-image"
+              src={project.image.src}
+              alt={project.image.alt}
+              width={project.image.width}
+              height={project.image.height}
+              loading={index < 2 ? "eager" : "lazy"}
+              style={
+                project.image.position
+                  ? { objectPosition: project.image.position }
+                  : undefined
+              }
+            />
+            <h2 className="project-title" id={`${project.id}-title`}>
+              {project.title}
+            </h2>
+            <p>{project.summary}</p>
+            {project.links.length > 0 && (
+              <p className="meta project-links">
+                {project.links.map((link) => (
+                  <ExternalLink href={link.href} key={link.href}>
+                    {link.label}
+                  </ExternalLink>
+                ))}
+              </p>
+            )}
+          </article>
+        ))}
+      </div>
     </SiteShell>
   );
 }

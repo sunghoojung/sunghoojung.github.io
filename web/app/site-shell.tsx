@@ -5,6 +5,7 @@ const pages = [
   { href: "/", label: "About" },
   { href: "/publications", label: "Publications" },
   { href: "/projects", label: "Projects" },
+  { href: "/blog", label: "Blog" },
 ] as const;
 
 export type PagePath = (typeof pages)[number]["href"];

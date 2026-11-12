@@ -29,10 +29,12 @@ export default defineConfig([
     },
   },
   {
-    // Pages link with plain anchors: the static export ships no router script.
+    // The static export ships no router script and has no image optimizer,
+    // so pages use plain anchors and images.
     files: ["app/**/*.tsx"],
     rules: {
       "@next/next/no-html-link-for-pages": "off",
+      "@next/next/no-img-element": "off",
     },
   },
 ]);

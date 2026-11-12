@@ -5,14 +5,23 @@ import scholar from "./scholar.json";
 export const profile = {
   name: "Sunghoo Jung",
   summary:
-    "Computer science and mathematics student working on machine learning research, systems, and reverse engineering.",
+    "Computer science and mathematics student at Rutgers University working on machine learning interpretability, systems, and reverse engineering.",
   email: "sunghoojungg@gmail.com",
+  photo: {
+    src: "/images/sunghoo-jung.webp",
+    width: 308,
+    height: 308,
+  },
   links: [
-    { label: "GitHub", href: "https://github.com/sunghoojung" },
-    { label: "LinkedIn", href: "https://www.linkedin.com/in/sunghoo-jung" },
-    { label: "Google Scholar", href: scholar.profileUrl },
+    { icon: "github", label: "GitHub", href: "https://github.com/sunghoojung" },
+    {
+      icon: "linkedin",
+      label: "LinkedIn",
+      href: "https://www.linkedin.com/in/sunghoo-jung",
+    },
+    { icon: "scholar", label: "Google Scholar", href: scholar.profileUrl },
   ],
-};
+} as const;
 
 export const scholarProfile = {
   url: scholar.profileUrl,
@@ -48,9 +57,16 @@ export const publications = [
 export type Project = {
   id: string;
   title: string;
-  context: string;
-  description: string;
-  stack: string[];
+  // One line, at a high level.
+  summary: string;
+  image: {
+    src: string;
+    alt: string;
+    width: number;
+    height: number;
+    // Which part of the image stays in view when it is cropped to the card.
+    position?: string;
+  };
   links: { label: string; href: string }[];
 };
 
@@ -58,10 +74,14 @@ export const projects: Project[] = [
   {
     id: "reverse-engineering-browser",
     title: "Reverse Engineering Browser",
-    context: "Independent project, Aug 2026 – present",
-    description:
-      "A custom Brave browser and native macOS workspace for tracing how web applications work, from a network request back to the code and browser events behind it. C++ probes write to bounded shared memory, and authenticated Unix sockets carry versioned records into the desktop app without JavaScript hooks or blocking the renderer.",
-    stack: ["C++20", "Chromium", "Mojo", "Unix IPC", "Swift"],
+    summary:
+      "A custom Brave browser and macOS app that traces how a web application works, from a network request back to the code behind it.",
+    image: {
+      src: "/images/projects/browser-app.webp",
+      alt: "Origin Trace desktop app showing a captured request to example.com with its timeline and details.",
+      width: 1200,
+      height: 754,
+    },
     links: [
       {
         label: "Repository",
@@ -70,35 +90,29 @@ export const projects: Project[] = [
     ],
   },
   {
-    id: "ai-video-detector",
-    title: "AI Video Detector",
-    context: "Independent research prototype",
-    description:
-      "A web application that analyzes short video clips and estimates whether they may be AI-generated. Uploads are routed through a web API to a separate inference worker. The model is experimental: validation found false positives on real footage, so results are presented as research signals, not proof of AI authorship.",
-    stack: ["TypeScript", "Go", "SQLite", "Python", "XCLIP", "XGBoost"],
-    links: [
-      {
-        label: "Website",
-        href: "https://ai-video-detector-sunny.up.railway.app",
-      },
-    ],
-  },
-  {
     id: "astra",
     title: "Astra NFT Bot",
-    context: "Go backend, team of six engineers",
-    description:
-      "An automatic NFT purchasing bot built with five other engineers. I developed the Go backend, coordinating wallets through goroutines and an Ethereum RPC hosted by our team. Detection to mempool took about 2 seconds, versus 10 seconds manually, across roughly $5M in purchases over two years.",
-    stack: ["Go", "Ethereum", "OpenSea", "RPC"],
+    summary:
+      "An automated NFT purchasing bot built by a team of six, for which I wrote the Go backend.",
+    image: {
+      src: "/images/projects/astra-dashboard.webp",
+      alt: "Astra NFT Sniper desktop dashboard showing its task list and controls.",
+      width: 1200,
+      height: 664,
+    },
     links: [],
   },
   {
     id: "lifesaver",
     title: "LifeSaver",
-    context: "Team project, YHack 2026 · 2nd overall and Most Creative Hack",
-    description:
-      "A browser-based surgical training simulator with an interactive operating room, anatomy exploration, and AI voice guidance, built to make hands-on practice accessible from a laptop.",
-    stack: ["React", "Three.js", "Gemini", "ElevenLabs", "MongoDB"],
+    summary:
+      "A browser-based surgical training simulator with AI voice guidance, placed 2nd overall at YHack 2026.",
+    image: {
+      src: "/images/projects/lifesaver.webp",
+      alt: "LifeSaver's 3D operating room with a patient model, surgical instruments, and a virtual doctor.",
+      width: 1200,
+      height: 573,
+    },
     links: [
       {
         label: "Devpost",
@@ -110,10 +124,15 @@ export const projects: Project[] = [
   {
     id: "microscopy",
     title: "Alpha-synuclein Analysis",
-    context: "Research assistant, Rutgers Neurodegenerative Diseases Lab",
-    description:
-      "A microscopy pipeline that segments cellular inclusions in 16-bit images and classifies their morphology. MicroSAM and medicoSAM were fine-tuned on 500+ annotated images and ResNet101 on 10,000+ classification images, raising morphology classification accuracy from 75% to 95%.",
-    stack: ["MicroSAM", "medicoSAM", "ResNet101", "PyTorch"],
+    summary:
+      "A microscopy pipeline that segments inclusions inside cells and classifies their shape.",
+    image: {
+      src: "/images/projects/microscopy.webp",
+      alt: "Microscopy image of a cell with four inclusions marked red and one marked green.",
+      width: 766,
+      height: 766,
+      position: "center 68%",
+    },
     links: [
       {
         label: "Repository",
@@ -122,21 +141,17 @@ export const projects: Project[] = [
     ],
   },
   {
-    id: "neo-seoul",
-    title: "Neo Seoul",
-    context: "Personal project",
-    description:
-      "An interactive 3D room that served as the previous version of this website. The scene was built in Blender with Astra and Blender MCP, exported as an optimized GLB, and rendered in the browser with instanced city geometry and frame-rate-adaptive quality.",
-    stack: ["Blender", "Blender MCP", "React Three Fiber", "TypeScript"],
-    links: [],
-  },
-  {
     id: "prosthetic-hand",
     title: "Prosthetic Hand",
-    context: "Capstone project",
-    description:
-      "A sensor glove that maps finger bends to a prosthetic hand. Two Arduino boards exchange movement data over HC-05 Bluetooth modules, with five flex sensors driving five servos.",
-    stack: ["Arduino", "C++", "HC-05 Bluetooth"],
+    summary:
+      "A sensor glove that wirelessly drives a five-servo prosthetic hand.",
+    image: {
+      src: "/images/projects/prosthetic-hand.webp",
+      alt: "Prosthetic hand prototype beside the sensor glove, wired to a breadboard and an Arduino.",
+      width: 532,
+      height: 706,
+      position: "center 38%",
+    },
     links: [
       {
         label: "Repository",

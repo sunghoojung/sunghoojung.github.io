@@ -19,6 +19,7 @@
     "export": "npm run build && node scripts/export-static.mjs"
   },
   "dependencies": {
+    "marked": "^16.4.2",
     "react": "19.2.6",
     "react-dom": "19.2.6"
   },

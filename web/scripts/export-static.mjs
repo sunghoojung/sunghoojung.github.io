@@ -3,17 +3,29 @@
 //
 // Every page is fixed text, so the exported HTML carries no scripts: pages are
 // rendered once here and linked with ordinary anchors.
-import { cp, mkdir, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, readdir, rm, writeFile } from "node:fs/promises";
 
 const root = new URL("../", import.meta.url);
 const out = new URL("out/", root);
 
-// GitHub Pages serves projects.html at /projects.
+const postSlugs = (await readdir(new URL("content/blog/", root)))
+  .filter((name) => name.endsWith(".md") && !name.startsWith("_"))
+  .map((name) => name.replace(/\.md$/, ""));
+
+// GitHub Pages serves projects.html at /projects. The blog list is written
+// twice so /blog works whether Pages resolves it as a file or as the folder
+// that holds the posts.
 const pages = [
-  { route: "/", file: "index.html", status: 200 },
-  { route: "/publications", file: "publications.html", status: 200 },
-  { route: "/projects", file: "projects.html", status: 200 },
-  { route: "/page-that-does-not-exist", file: "404.html", status: 404 },
+  { route: "/", files: ["index.html"], status: 200 },
+  { route: "/publications", files: ["publications.html"], status: 200 },
+  { route: "/projects", files: ["projects.html"], status: 200 },
+  { route: "/blog", files: ["blog.html", "blog/index.html"], status: 200 },
+  ...postSlugs.map((slug) => ({
+    route: `/blog/${slug}`,
+    files: [`blog/${slug}.html`],
+    status: 200,
+  })),
+  { route: "/page-that-does-not-exist", files: ["404.html"], status: 404 },
 ];
 
 const { default: worker } = await import(
@@ -57,10 +69,12 @@ for (const page of pages) {
       `${page.route} returned ${response.status}, expected ${page.status}.`,
     );
   }
-  await writeFile(
-    new URL(page.file, out),
-    withoutScripts(await response.text()),
-  );
+  const html = withoutScripts(await response.text());
+  for (const file of page.files) {
+    const target = new URL(file, out);
+    await mkdir(new URL("./", target), { recursive: true });
+    await writeFile(target, html);
+  }
 }
 
 // Serve the files as they are, including paths that begin with an underscore.

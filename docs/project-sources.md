@@ -1,8 +1,21 @@
 # Content sources
 
-The page's text lives in `web/app/content.ts`. NDA-covered rail analysis is
-excluded, including images, implementation details, metrics, and legacy page
-descriptions. Do not reintroduce it from a resume or local research files.
+The site's text lives in `web/app/content.ts` and `web/app/page.tsx`.
+
+## Rail Lab
+
+Rail work is covered by an NDA. At the site owner's request (2026-11-12) the
+About page names the Rail Lab at a high level only: the role, that the work
+serves partners in the rail industry, and the current LiDAR focus. Images,
+implementation details, metrics, and project descriptions stay excluded. Do not
+add them from a resume or local research files, and do not list rail work under
+Projects.
+
+## About
+
+The labs and research interests on the About page are as stated by the site
+owner. The link for Ruixiang Tang's lab is his Rutgers RAD Collaboratory
+profile.
 
 ## Publications
 
@@ -21,10 +34,27 @@ The Google Scholar frame shows a saved copy of the profile; see the README.
 
 ## Projects
 
+Each project has one high-level line and one image.
+
 - **Reverse Engineering Browser:** the public [repository](https://github.com/sunghoojung/reverse-engineering-browser) and its README.
-- **AI Video Detector:** the live research preview and its explicit validation warning. Evaluation found false positives on real bird and pedestrian footage; the project is presented as experimental, not as a reliable detector.
-- **Astra NFT Bot:** `Sunghoo_Jung.tex` in the user's resume repository. Team size, purchase volume, timing, and technologies come from the resume. Purchase volume is not revenue or profit, and the timing ends at the mempool, not confirmation.
-- **LifeSaver:** the team's [Devpost submission](https://devpost.com/software/lifesaver-lnm0tz) and [repository](https://github.com/akhilm2223/yale). Award names follow Devpost.
+- **Astra NFT Bot:** `Sunghoo_Jung.tex` in the user's resume repository, for the team size and the Go backend role.
+- **LifeSaver:** the team's [Devpost submission](https://devpost.com/software/lifesaver-lnm0tz) and [repository](https://github.com/akhilm2223/yale). The placement follows Devpost.
 - **Alpha-synuclein Analysis:** the resume and the public [segment-classify-pipeline repository](https://github.com/sunghoojung/segment-classify-pipeline).
-- **Neo Seoul:** the 3D room that was this website's previous homepage. The user identified Astra and Blender MCP as the creation workflow. Astra here is the creation tool, separate from the NFT bot.
-- **Prosthetic Hand:** the public [Prosethic-Hand repository](https://github.com/sunghoojung/Prosethic-Hand), including its README, `transmitter.ino`, and `receiver.ino`.
+- **Prosthetic Hand:** the public [Prosethic-Hand repository](https://github.com/sunghoojung/Prosethic-Hand).
+
+The AI Video Detector and Neo Seoul were removed from the list at the site
+owner's request.
+
+## Images
+
+Images are local, in `web/public/images`, converted to WebP and resized to at
+most 1200 pixels wide.
+
+| Asset                           | Origin                                                                                                                                                    |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sunghoo-jung.webp`             | Profile photo supplied by the site owner on 2026-11-12                                                                                                    |
+| `projects/browser-app.webp`     | Origin Trace app screenshot captured locally in a metadata-only session using example.com on 2026-09-24                                                   |
+| `projects/astra-dashboard.webp` | Screenshot of Astra NFT Sniper v2.2.7, supplied by the site owner on 2026-09-24                                                                           |
+| `projects/lifesaver.webp`       | `image.png` in [akhilm2223/yale](https://github.com/akhilm2223/yale/blob/main/image.png)                                                                  |
+| `projects/microscopy.webp`      | Final overlay from the public [example notebook](https://github.com/sunghoojung/segment-classify-pipeline/blob/master/example.ipynb), cropped to the plot |
+| `projects/prosthetic-hand.webp` | `Prosethic-Hand` README image of the prototype hand and control electronics                                                                               |
