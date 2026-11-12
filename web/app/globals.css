@@ -1,0 +1,327 @@
+:root {
+  color-scheme: light dark;
+  --background: #ffffff;
+  --text: #1a1a1a;
+  --muted: #6b6b6b;
+  --rule: #e5e5e5;
+  --accent: #1f6fd0;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #18191b;
+    --text: #e4e4e4;
+    --muted: #9a9a9a;
+    --rule: #333437;
+    --accent: #6ba6e8;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  margin: 0;
+  background: var(--background);
+  color: var(--text);
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+p,
+ol,
+ul {
+  margin: 0;
+  padding: 0;
+}
+
+ol,
+ul {
+  list-style: none;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+.skip-link {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  padding: 6px 10px;
+  background: var(--background);
+  transform: translateY(-300%);
+}
+
+.skip-link:focus {
+  transform: none;
+}
+
+/* Header and footer */
+
+.site-header {
+  border-bottom: 1px solid var(--rule);
+}
+
+.site-header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 24px;
+  max-width: 880px;
+  min-height: 56px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.site-header a {
+  color: var(--text);
+}
+
+.site-name {
+  margin-right: auto;
+}
+
+.site-header nav {
+  display: flex;
+  gap: 24px;
+}
+
+.site-header nav a[aria-current="page"] {
+  color: var(--accent);
+}
+
+main {
+  flex: 1;
+  width: 100%;
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 56px 24px 80px;
+}
+
+.site-footer {
+  padding: 14px 24px;
+  border-top: 1px solid var(--rule);
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+/* Type */
+
+h1 {
+  margin-bottom: 28px;
+  font-size: 40px;
+  font-weight: 300;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+
+h2 {
+  margin-bottom: 20px;
+  font-size: 24px;
+  font-weight: 400;
+  line-height: 1.3;
+}
+
+.entry-title,
+.publication-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.meta {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.meta strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+main > section {
+  margin-top: 48px;
+  padding-top: 40px;
+  border-top: 1px solid var(--rule);
+}
+
+/* About */
+
+.about {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 200px;
+  column-gap: 56px;
+}
+
+.prose p + p {
+  margin-top: 16px;
+}
+
+.contact {
+  font-size: 15px;
+}
+
+.contact li + li {
+  margin-top: 6px;
+}
+
+.contact-email {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--rule);
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  overflow-wrap: anywhere;
+}
+
+/* Project entries */
+
+.entry + .entry {
+  margin-top: 32px;
+}
+
+.entry > .meta + p {
+  margin-top: 8px;
+}
+
+.entry-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 16px;
+  margin-top: 8px;
+}
+
+/* Publications */
+
+.publications li {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  column-gap: 24px;
+}
+
+.publications li + li {
+  margin-top: 28px;
+}
+
+.publication-year {
+  color: var(--muted);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.65;
+}
+
+.publication-title {
+  margin-bottom: 4px;
+}
+
+.publication-title a {
+  color: var(--text);
+}
+
+.scholar-frame {
+  display: block;
+  width: 100%;
+  height: 620px;
+  border: 1px solid var(--rule);
+  background: var(--background);
+}
+
+.scholar-note {
+  margin-top: 8px;
+}
+
+@media (max-width: 720px) {
+  main {
+    padding: 40px 20px 64px;
+  }
+
+  .site-header-inner {
+    gap: 16px;
+    padding: 0 20px;
+  }
+
+  .site-header nav {
+    gap: 16px;
+  }
+
+  h1 {
+    font-size: 32px;
+  }
+
+  .about {
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 24px;
+  }
+
+  .contact ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 20px;
+  }
+
+  .contact li + li {
+    margin-top: 0;
+  }
+
+  .contact-email {
+    display: none;
+  }
+
+  .publications li {
+    display: block;
+  }
+
+  .scholar-frame {
+    height: 560px;
+  }
+}
+
+@media print {
+  .site-header nav,
+  .skip-link,
+  .scholar-frame,
+  .scholar-note {
+    display: none;
+  }
+}
