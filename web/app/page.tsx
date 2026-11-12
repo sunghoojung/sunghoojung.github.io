@@ -49,9 +49,12 @@ export default function AboutPage() {
             interpretability and model steering.
           </p>
           <p>
-            I am also a research assistant in the Rail Lab, where I build and
-            maintain solutions for real-world partners in the rail industry,
-            currently with a focus on LiDAR.
+            I am also a research assistant in the{" "}
+            <ExternalLink href="https://rail.rutgers.edu/">
+              Rail Lab
+            </ExternalLink>
+            , where I build and maintain solutions for real-world partners in
+            the rail industry, currently with a focus on LiDAR.
           </p>
           <p>
             Before these, I was a machine learning research assistant in the

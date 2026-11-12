@@ -68,7 +68,7 @@ test("about page shows the photo, labs, and labelled contact links", () => {
   assert.match(html, /Rutgers University/);
   assert.match(html, /Ruixiang Tang’s lab/);
   assert.match(html, /interpretability and model steering/);
-  assert.match(html, /Rail Lab/);
+  assert.match(html, /href="https:\/\/rail\.rutgers\.edu\/"[^>]*>Rail Lab</);
   assert.match(html, /Neurodegenerative Diseases Lab/);
   assert.match(html, /I began programming at 14/);
   // Icon-only links need a name for screen readers.

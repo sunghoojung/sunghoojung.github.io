@@ -15,7 +15,8 @@ Projects.
 
 The labs and research interests on the About page are as stated by the site
 owner. The link for Ruixiang Tang's lab is his Rutgers RAD Collaboratory
-profile.
+profile. The Rail Lab links to the Rutgers Rail and Transit Program site,
+rail.rutgers.edu.
 
 ## Publications
 
