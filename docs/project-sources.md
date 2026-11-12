@@ -41,10 +41,9 @@ Each project has one high-level line and one image.
 - **Astra NFT Bot:** `Sunghoo_Jung.tex` in the user's resume repository, for the team size and the Go backend role.
 - **LifeSaver:** the team's [Devpost submission](https://devpost.com/software/lifesaver-lnm0tz) and [repository](https://github.com/akhilm2223/yale). The placement follows Devpost.
 - **Alpha-synuclein Analysis:** the resume and the public [segment-classify-pipeline repository](https://github.com/sunghoojung/segment-classify-pipeline).
-- **Prosthetic Hand:** the public [Prosethic-Hand repository](https://github.com/sunghoojung/Prosethic-Hand).
 
-The AI Video Detector and Neo Seoul were removed from the list at the site
-owner's request.
+The AI Video Detector, Neo Seoul, and Prosthetic Hand were removed from the
+list at the site owner's request.
 
 ## Images
 
@@ -58,4 +57,3 @@ most 1200 pixels wide.
 | `projects/astra-dashboard.webp` | Screenshot of Astra NFT Sniper v2.2.7, supplied by the site owner on 2026-09-24                                                                           |
 | `projects/lifesaver.webp`       | `image.png` in [akhilm2223/yale](https://github.com/akhilm2223/yale/blob/main/image.png)                                                                  |
 | `projects/microscopy.webp`      | Final overlay from the public [example notebook](https://github.com/sunghoojung/segment-classify-pipeline/blob/master/example.ipynb), cropped to the plot |
-| `projects/prosthetic-hand.webp` | `Prosethic-Hand` README image of the prototype hand and control electronics                                                                               |

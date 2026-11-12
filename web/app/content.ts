@@ -140,23 +140,4 @@ export const projects: Project[] = [
       },
     ],
   },
-  {
-    id: "prosthetic-hand",
-    title: "Prosthetic Hand",
-    summary:
-      "A sensor glove that wirelessly drives a five-servo prosthetic hand.",
-    image: {
-      src: "/images/projects/prosthetic-hand.webp",
-      alt: "Prosthetic hand prototype beside the sensor glove, wired to a breadboard and an Arduino.",
-      width: 532,
-      height: 706,
-      position: "center 38%",
-    },
-    links: [
-      {
-        label: "Repository",
-        href: "https://github.com/sunghoojung/Prosethic-Hand",
-      },
-    ],
-  },
 ];

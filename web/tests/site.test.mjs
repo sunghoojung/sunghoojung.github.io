@@ -131,7 +131,7 @@ test("each project has an image, a heading, and a one-line summary", () => {
   const articles = [
     ...html.matchAll(/<article\b[^>]*>[\s\S]*?<\/article>/g),
   ].map(([article]) => article);
-  assert.equal(articles.length, 5);
+  assert.equal(articles.length, 4);
   for (const article of articles) {
     const heading = article.match(/aria-labelledby="([^"]+)"/)?.[1];
     assert.ok(heading);
