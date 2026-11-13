@@ -19,6 +19,7 @@ export const profile = {
       label: "LinkedIn",
       href: "https://www.linkedin.com/in/sunghoo-jung",
     },
+    { icon: "x", label: "X", href: "https://x.com/sunny17347" },
     { icon: "scholar", label: "Google Scholar", href: scholar.profileUrl },
   ],
 } as const;

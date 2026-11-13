@@ -72,12 +72,13 @@ test("about page shows the photo, labs, and labelled contact links", () => {
   assert.match(html, /Neurodegenerative Diseases Lab/);
   assert.match(html, /I began programming at 14/);
   // Icon-only links need a name for screen readers.
-  for (const label of ["Email", "GitHub", "LinkedIn", "Google Scholar"]) {
+  for (const label of ["Email", "GitHub", "LinkedIn", "X", "Google Scholar"]) {
     assert.match(html, new RegExp(`<a[^>]+aria-label="${label}"`));
   }
   assert.match(html, /href="mailto:[^"]+"/);
   assert.match(html, /href="https:\/\/github\.com\/sunghoojung"/);
   assert.match(html, /href="https:\/\/www\.linkedin\.com\/in\/sunghoo-jung"/);
+  assert.match(html, /href="https:\/\/x\.com\/sunny17347"/);
   assert.match(
     html,
     /rel="canonical" href="https:\/\/sunghoojung\.github\.io\/?"/,
