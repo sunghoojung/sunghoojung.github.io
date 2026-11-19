@@ -412,17 +412,36 @@ main > section {
   font-size: 0.88em;
 }
 
+/* Code blocks look like VS Code's editor: Dark+ colors, which the renderer
+   writes onto each token, and VS Code's default fonts. */
 .post-body pre {
-  padding: 14px 16px;
+  margin: 20px 0;
+  padding: 16px 18px;
+  border: 1px solid var(--rule);
   border-radius: 8px;
-  background: var(--surface);
-  line-height: 1.5;
+  background: #1e1e1e;
+  color: #d4d4d4;
+  font-family: Menlo, Monaco, Consolas, "Courier New", monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  tab-size: 4;
   overflow-x: auto;
+}
+
+.post-body pre[data-lang]::before {
+  content: attr(data-lang);
+  display: block;
+  margin-bottom: 10px;
+  color: #858585;
+  font-size: 11px;
+  letter-spacing: 0.04em;
 }
 
 .post-body pre code {
   padding: 0;
   background: none;
+  color: inherit;
+  font: inherit;
 }
 
 .post-body figure {

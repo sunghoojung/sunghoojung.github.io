@@ -21,7 +21,8 @@
   "dependencies": {
     "marked": "^16.4.2",
     "react": "19.2.6",
-    "react-dom": "19.2.6"
+    "react-dom": "19.2.6",
+    "shiki": "4.5.0"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "1.37.1",

@@ -1,10 +1,53 @@
 import { Marked, type Token } from "marked";
+import { createHighlighterCoreSync } from "shiki/core";
+import { createJavaScriptRegexEngine } from "shiki/engine/javascript";
+import javascript from "shiki/langs/javascript.mjs";
+import json from "shiki/langs/json.mjs";
+import python from "shiki/langs/python.mjs";
+import shellscript from "shiki/langs/shellscript.mjs";
+import tsx from "shiki/langs/tsx.mjs";
+import typescript from "shiki/langs/typescript.mjs";
+import darkPlus from "shiki/themes/dark-plus.mjs";
 
 // How a post's Markdown becomes HTML. The site (posts.ts) and the dev-only
 // editor (editor/client.ts) both use this, so the editor shows a post exactly
 // as the site renders it.
 
 export { frontMatterPattern, readFrontMatter } from "./front-matter";
+
+// Code blocks are colored the way VS Code colors them, with its grammars and
+// its Dark+ theme. The colors are written into the HTML when the page is
+// built, so no script ships. A block in another language, or none, keeps the
+// theme's plain text color.
+const highlighter = createHighlighterCoreSync({
+  themes: [darkPlus],
+  langs: [javascript, json, python, shellscript, tsx, typescript],
+  engine: createJavaScriptRegexEngine(),
+});
+const plainText = ["", "text", "txt", "plain", "plaintext"];
+
+function highlight(text: string, lang?: string) {
+  const name = (lang ?? "").trim().split(/\s+/)[0].toLowerCase();
+  const known =
+    !plainText.includes(name) &&
+    highlighter.getLoadedLanguages().includes(name);
+  return highlighter.codeToHtml(text, {
+    lang: known ? name : "text",
+    theme: "dark-plus",
+    transformers: [
+      {
+        // The language label (globals.css shows it), and the class the
+        // editor reads back when it turns a block into Markdown.
+        pre(node) {
+          if (known) node.properties["data-lang"] = name;
+        },
+        code(node) {
+          if (name) node.properties.class = `language-${name}`;
+        },
+      },
+    ],
+  });
+}
 
 // Pictures are written by file name (fig1.png) and live in
 // public/images/blog/<slug>/. Paths and full URLs are left alone.
@@ -81,6 +124,9 @@ export const markdown = new Marked({
     },
     image({ href, title, text }) {
       return picture(href, text, title);
+    },
+    code({ text, lang }) {
+      return `${highlight(text, lang)}\n`;
     },
   },
 });
