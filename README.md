@@ -18,12 +18,29 @@ Content sources and the list of excluded material are in
 
 ## Writing a blog post
 
-Each post is a Markdown file in `web/content/blog`. Copy
-`web/content/blog/_template.md`, rename it to the address you want
-(`my-first-post.md` becomes `/blog/my-first-post`), set the `title`, `date`
-(as `YYYY-MM-DD`), and optional `summary` at the top, and write the post below
-them. Commit and push to publish it. Posts are listed newest first, and files
-whose names begin with an underscore are not published.
+Each post is one Markdown file in `web/content/blog`; the file name is the
+address (`my-post.md` is `/blog/my-post`). From `web`:
+
+```sh
+npm run new-post -- "My post title"   # creates content/blog/my-post-title.md
+npm run dev                           # open http://localhost:3000/blog
+```
+
+Edit the file in any editor and save; the dev server restarts and the page
+reloads with your change. A new post starts with `draft: true` in its front
+matter. A draft appears only under `npm run dev` (marked "Draft"); builds leave
+out its page, its link, and its pictures. To publish, delete the `draft: true`
+line, then commit and push to `main`.
+
+The top of a post is `title`, `date` (`YYYY-MM-DD`), an optional `description`
+for the blog list, and `draft: true` while it is unfinished. Posts are listed
+newest first. Files whose names begin with an underscore, such as
+`_template.md`, are never published.
+
+Write plain Markdown. Pictures go in `web/public/images/blog/my-post/` and are
+written by file name, `![Caption](chart.png)`; a picture alone on its line
+becomes a captioned figure. Headings get anchors, so `[results](#results)`
+jumps to `## Results`.
 
 ## Google Scholar embed
 
@@ -54,7 +71,8 @@ npm ci
 npm run dev
 ```
 
-Verify a change with `npm run lint`, `npm run typecheck`, and `npm test`.
+Verify a change with `npm run lint`, `npm run typecheck`, and `npm test`. To
+publish, commit and push to `main`; the deployment below does the rest.
 
 ## GitHub Pages deployment
 
@@ -70,12 +88,3 @@ The repository's Settings > Pages source must be "GitHub Actions".
 `index.html`, `publications.html`, `projects.html`, the blog pages, `404.html`,
 the stylesheet, images, and the saved Scholar profile. `web/scripts/export-static.mjs` renders each page
 once and removes the framework's scripts, since no page needs them.
-
-`npm start` still serves the built site from Node (`web/railway.toml` uses it),
-where `/about` and `/bedroom` redirect to the home page.
-
-## Neo Seoul room
-
-The interactive 3D room that used to be the homepage, with its Blender sources,
-is not part of this site. It lives in the
-[sunghoo_website](https://github.com/sunghoojung/sunghoo_website) repository.

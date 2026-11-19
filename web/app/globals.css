@@ -334,6 +334,16 @@ main > section {
   margin-top: 24px;
 }
 
+.post-thumb {
+  display: block;
+  width: 100%;
+  max-width: 360px;
+  height: auto;
+  margin-top: 12px;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+}
+
 .post-date {
   color: var(--muted);
   font-size: 14px;
@@ -413,6 +423,43 @@ main > section {
 .post-body pre code {
   padding: 0;
   background: none;
+}
+
+.post-body figure {
+  margin: 28px 0;
+}
+
+.post-body figcaption {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.post-body table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+  font-size: 15px;
+}
+
+.post-body th,
+.post-body td {
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--rule);
+  text-align: left;
+}
+
+.draft-tag {
+  margin-left: 10px;
+  padding: 1px 8px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+  vertical-align: middle;
 }
 
 .post-body hr {

@@ -16,7 +16,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!post) return {};
   return {
     title: `${post.title} | ${profile.name}`,
-    description: post.summary,
+    description: post.description,
     alternates: { canonical: `/blog/${post.slug}` },
   };
 }
@@ -31,6 +31,7 @@ export default async function PostPage({ params }: Props) {
         <h1>{post.title}</h1>
         <time className="meta post-meta" dateTime={post.date}>
           {formatDate(post.date)}
+          {post.draft && <span className="draft-tag">Draft</span>}
         </time>
         {/* The HTML comes from this repository's own Markdown files. */}
         <div

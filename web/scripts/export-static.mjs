@@ -3,14 +3,21 @@
 //
 // Every page is fixed text, so the exported HTML carries no scripts: pages are
 // rendered once here and linked with ordinary anchors.
-import { cp, mkdir, readdir, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 
 const root = new URL("../", import.meta.url);
 const out = new URL("out/", root);
 
-const postSlugs = (await readdir(new URL("content/blog/", root)))
-  .filter((name) => name.endsWith(".md") && !name.startsWith("_"))
-  .map((name) => name.replace(/\.md$/, ""));
+// Published posts only: no underscore prefix and no `draft: true`.
+const postSlugs = [];
+const draftSlugs = [];
+for (const name of await readdir(new URL("content/blog/", root))) {
+  if (!name.endsWith(".md") || name.startsWith("_")) continue;
+  const source = await readFile(new URL(`content/blog/${name}`, root), "utf8");
+  const frontMatter = source.match(/^---\r?\n([\s\S]*?)\r?\n---/)?.[1] ?? "";
+  const slug = name.replace(/\.md$/, "");
+  (/^draft:\s*true\s*$/m.test(frontMatter) ? draftSlugs : postSlugs).push(slug);
+}
 
 // GitHub Pages serves projects.html at /projects. The blog list is written
 // twice so /blog works whether Pages resolves it as a file or as the folder
@@ -57,6 +64,8 @@ await cp(new URL("dist/client/", root), out, {
   recursive: true,
   filter: (source) =>
     !/\.(js|map)$/.test(source) &&
+    // A draft's pictures stay out of the published site.
+    !draftSlugs.some((slug) => source.includes(`/images/blog/${slug}`)) &&
     !/(^|\/)(\.vite|\.assetsignore|_headers|vinext-client-entry-manifest\.json)$/.test(
       source,
     ),

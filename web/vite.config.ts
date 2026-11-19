@@ -1,6 +1,6 @@
 import vinext from "vinext";
 import { defineConfig } from "vite";
-import { sites } from "./build/sites-vite-plugin";
+import { blogReload } from "./build/blog-reload";
 
 const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";
 
@@ -22,7 +22,7 @@ export default defineConfig(async () => {
     },
     plugins: [
       vinext(),
-      sites(),
+      blogReload(),
       cloudflare({
         viteEnvironment: { name: "rsc", childEnvironments: ["ssr"] },
         config: {

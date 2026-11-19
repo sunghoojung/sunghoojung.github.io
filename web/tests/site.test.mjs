@@ -17,9 +17,21 @@ const scholarConfig = JSON.parse(
   readFileSync(new URL("../app/scholar.json", import.meta.url), "utf8"),
 );
 const scholarSnapshot = read("scholar/profile.html");
-const postFiles = readdirSync(
-  new URL("../content/blog/", import.meta.url),
-).filter((name) => name.endsWith(".md") && !name.startsWith("_"));
+const allPosts = readdirSync(new URL("../content/blog/", import.meta.url))
+  .filter((name) => name.endsWith(".md") && !name.startsWith("_"))
+  .map((name) => ({
+    slug: name.replace(/\.md$/, ""),
+    source: readFileSync(
+      new URL(`../content/blog/${name}`, import.meta.url),
+      "utf8",
+    ),
+  }));
+const isDraft = ({ source }) =>
+  /^draft:\s*true\s*$/m.test(
+    source.match(/^---\r?\n([\s\S]*?)\r?\n---/)?.[1] ?? "",
+  );
+const postFiles = allPosts.filter((post) => !isDraft(post));
+const draftFiles = allPosts.filter(isDraft);
 
 function imageSources(html) {
   return [...html.matchAll(/<img\b[^>]*\ssrc="\/([^"]+)"/g)].map(
@@ -157,12 +169,17 @@ test("blog lists each post and exports a page for it", () => {
   if (postFiles.length === 0) {
     assert.match(pages.blog, /No posts yet\./);
   }
-  for (const file of postFiles) {
-    const slug = file.replace(/\.md$/, "");
+  for (const { slug } of postFiles) {
     assert.ok(pages.blog.includes(`href="/blog/${slug}"`), slug);
     const post = read(`blog/${slug}.html`);
     assert.doesNotMatch(post, /<script\b/i, slug);
     assert.match(post, /<article class="post">/);
+  }
+  // Drafts are for `npm run dev` only: no page, no link, no pictures.
+  for (const { slug } of draftFiles) {
+    assert.ok(!pages.blog.includes(slug), `${slug} is not listed`);
+    assert.ok(!existsSync(new URL(`blog/${slug}.html`, out)), slug);
+    assert.ok(!existsSync(new URL(`images/blog/${slug}`, out)), slug);
   }
   // The template explains the format and must never be published.
   assert.ok(!existsSync(new URL("blog/_template.html", out)));
