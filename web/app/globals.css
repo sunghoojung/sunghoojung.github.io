@@ -462,6 +462,10 @@ main > section {
   vertical-align: middle;
 }
 
+.toc ul {
+  margin-top: 4px;
+}
+
 .post-body hr {
   height: 1px;
   border: 0;

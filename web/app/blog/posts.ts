@@ -1,4 +1,4 @@
-import { Marked } from "marked";
+import { Marked, type Token } from "marked";
 
 // Posts are Markdown files in web/content/blog. The file name is the URL:
 // content/blog/my-post.md is served at /blog/my-post. Files whose names begin
@@ -22,16 +22,41 @@ export type Post = {
   html: string;
 };
 
+function headingId(tokens: Token[]) {
+  return tokens
+    .map((token) => token.raw)
+    .join("")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+// The list of ## and ### headings that replaces <!-- contents --> in a post.
+function contents(body: string) {
+  let html = "";
+  let open = false;
+  let sub = false;
+  for (const token of markdown.lexer(body)) {
+    if (token.type !== "heading" || token.depth > 3) continue;
+    if (token.depth === 2 && token.text === "Contents") continue;
+    const link = `<a href="#${headingId(token.tokens ?? [])}">${token.text}</a>`;
+    if (token.depth === 2) {
+      html += `${sub ? "</ul></li>" : open ? "</li>" : ""}<li>${link}`;
+      open = true;
+      sub = false;
+    } else if (open) {
+      html += `${sub ? "" : "<ul>"}<li>${link}</li>`;
+      sub = true;
+    }
+  }
+  return `<nav class="toc" aria-label="Contents"><ol>${html}${sub ? "</ul></li>" : "</li>"}</ol></nav>`;
+}
+
 const markdown = new Marked({
   renderer: {
     // Headings get ids, so a link such as [results](#results) can jump to them.
     heading({ tokens, depth }) {
-      const id = tokens
-        .map((token) => token.raw)
-        .join("")
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-+|-+$/g, "");
+      const id = headingId(tokens);
       return `<h${depth} id="${id}">${this.parser.parseInline(tokens)}</h${depth}>\n`;
     },
     // An image alone on a line becomes a figure captioned with its alt text.
@@ -79,16 +104,18 @@ function parsePost(path: string, source: string): Post {
         : `/images/blog/${slug}/${fields.thumbnail}`
       : undefined,
     draft: fields.draft === "true",
-    html: markdown.parse(match[2], {
-      async: false,
-      // Pictures are written by file name (fig1.png) and live in
-      // public/images/blog/<slug>/.
-      walkTokens(token) {
-        if (token.type === "image" && !/^(\/|[a-z]+:)/i.test(token.href)) {
-          token.href = `/images/blog/${slug}/${token.href}`;
-        }
-      },
-    }),
+    html: markdown
+      .parse(match[2], {
+        async: false,
+        // Pictures are written by file name (fig1.png) and live in
+        // public/images/blog/<slug>/.
+        walkTokens(token) {
+          if (token.type === "image" && !/^(\/|[a-z]+:)/i.test(token.href)) {
+            token.href = `/images/blog/${slug}/${token.href}`;
+          }
+        },
+      })
+      .replace("<!-- contents -->", () => contents(match[2])),
   };
 }
 

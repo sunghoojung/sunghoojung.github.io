@@ -12,7 +12,7 @@ tags:
   - experiment-log
 ---
 
-> **Draft, 17 November 2026.** Three runs are still training (g4c, g4e, g4f). Their numbers below are partial and marked as such.
+> Draft, 17 November 2026. Three runs are still training (g4c, g4e, g4f). Their numbers below are partial and marked as such.
 
 I fine-tuned a 4-billion-parameter vision-language model to solve image puzzles from human demonstrations. For a week the held-out score would not move. Then three things moved it: more data, a loss aimed at the decision, and a pointing loss for the vision tower. After that it stopped again, at about 0.84.
 
@@ -22,35 +22,26 @@ It works on picture grids. On free-form canvases it does not beat the written pl
 
 ## TL;DR
 
-- **Task.** Qwen3-VL-4B with LoRA, trained on 1,082 pages of recorded human demonstrations. Scored on 397 held-out pages by one strict number: is the whole plan on the page's first step right?
-- **What plateaued.** Five written-reasoning formats, GRPO, vision LoRA at a low rate, 4× more image tokens and an 8B model. The three best formats all peaked at exactly 65 of 151 new-family pages.
-- **What moved.** More data (+18 to +22 pages on the same 310 held-out pages), then putting the loss on the decision tokens (0.844), then a pointing loss (0.839, a tie that arrived three epochs sooner).
-- **Jev-style checks.** One `Check [x,y] ->` branch per candidate point, answered by the model's own `" yes"` / `" no"` probabilities. Grids: 58-60 of 62, level with or above the written plan. Canvas clicks: 151 of 180 at best, against 157-158 for the written plan.
-- **The instructive failure.** The first version collapsed on canvas (95 to 52 of 180) because several candidates landed on one object. 898 of 988 wrong yeses sat within 60 px of a real target. My first diagnosis was wrong, and the data said so.
-- **The finding.** On the best checkpoint, the checks pass 398 of 399 of the written plan's correct points and 14 of its 19 wrong ones. They inherit its mistakes.
-- **In progress.** Drag "where" questions: the grab is within 30 px on 79% of pages, the landing within 20 px on only 40%.
+- Task. Qwen3-VL-4B with LoRA, trained on 1,082 pages of recorded human demonstrations. Scored on 397 held-out pages by one strict number: is the whole plan on the page's first step right?
+- What plateaued. Five written-reasoning formats, GRPO, vision LoRA at a low rate, 4× more image tokens and an 8B model. The three best formats all peaked at exactly 65 of 151 new-family pages.
+- What moved. More data (+18 to +22 pages on the same 310 held-out pages), then putting the loss on the decision tokens (0.844), then a pointing loss (0.839, a tie that arrived three epochs sooner).
+- Jev-style checks. One `Check [x,y] ->` branch per candidate point, answered by the model's own `" yes"` / `" no"` probabilities. Grids: 58-60 of 62, level with or above the written plan. Canvas clicks: 151 of 180 at best, against 157-158 for the written plan.
+- The instructive failure. The first version collapsed on canvas (95 to 52 of 180) because several candidates landed on one object. 898 of 988 wrong yeses sat within 60 px of a real target. My first diagnosis was wrong, and the data said so.
+- The finding. On the best checkpoint, the checks pass 398 of 399 of the written plan's correct points and 14 of its 19 wrong ones. They inherit its mistakes.
+- In progress. Drag "where" questions: the grab is within 30 px on 79% of pages, the landing within 20 px on only 40%.
 
 ## Contents
 
-1. [Why this problem](#why-this-problem)
-2. [Setup and scoreboard](#setup-and-scoreboard)
-3. [What plateaued](#what-plateaued)
-4. [What moved the needle](#what-moved-the-needle)
-5. [The Jev idea](#the-jev-idea)
-6. [Jev versions, and how the first one failed](#jev-versions-and-how-the-first-one-failed)
-7. [Findings](#findings)
-8. [Lessons](#lessons)
-9. [What is next](#what-is-next)
-10. [Mistakes worth admitting](#mistakes-worth-admitting)
+<!-- contents -->
 
 ## Why this problem
 
 The puzzles are small images with a one-line instruction. There are four kinds:
 
-- **Picture grids.** A 3×3 grid of photos: "Pick all objects that melt at room temperature."
-- **Canvas clicks.** A 500×550 scene with many small objects: "Find drinks that can be hot or cold."
-- **Drags.** Move a piece to where it fits: "Drag the letter to the place where it fits."
-- **Boxes.** "Please draw a box around the object that is different."
+- Picture grids. A 3×3 grid of photos: "Pick all objects that melt at room temperature."
+- Canvas clicks. A 500×550 scene with many small objects: "Find drinks that can be hot or cold."
+- Drags. Move a piece to where it fits: "Drag the letter to the place where it fits."
+- Boxes. "Please draw a box around the object that is different."
 
 They are a good testbed for vision-language models for three reasons. Every answer is checkable, so there is no judging. The instructions mix perception ("the faint letter") with world knowledge ("melts at room temperature"). And a page often needs several actions, so the model has to commit to a plan.
 
@@ -60,13 +51,13 @@ The question I kept coming back to is simple. When a small model gets a page wro
 
 ## Setup and scoreboard
 
-**Model.** Qwen3-VL-4B-Instruct in bf16. LoRA rank 16, α 32, on the seven language projections (33M parameters). Later runs also put LoRA on the 24 vision blocks and the merger (7.2M more).
+Model. Qwen3-VL-4B-Instruct in bf16. LoRA rank 16, α 32, on the seven language projections (33M parameters). Later runs also put LoRA on the 24 vision blocks and the merger (7.2M more).
 
-**Hardware.** Almost everything ran on one 16 GB RTX 4060 Ti. One epoch takes 60-75 minutes and an 8-epoch run about 12-13 hours. On the last day I added a rented 2× RTX 5080, about 2.3× faster per step, to run two experiments at once.
+Hardware. Almost everything ran on one 16 GB RTX 4060 Ti. One epoch takes 60-75 minutes and an 8-epoch run about 12-13 hours. On the last day I added a rented 2× RTX 5080, about 2.3× faster per step, to run two experiments at once.
 
-**Data.** 1,096 recorded episodes gave 4,246 usable steps from 1,048 challenges. The final split has 1,082 training pages, 397 held-out pages, and 18 pages from two question families held out completely.
+Data. 1,096 recorded episodes gave 4,246 usable steps from 1,048 challenges. The final split has 1,082 training pages, 397 held-out pages, and 18 pages from two question families held out completely.
 
-**Output.** On each step the model writes three short lines and an action:
+Output. On each step the model writes three short lines and an action:
 
 ```text
 Selected: [...]     what is already done
@@ -74,9 +65,9 @@ Remaining: [...]    every action still to take, in panel pixels
 Target: {...}       the next action
 ```
 
-**Metric.** _First-step plan right_: on a page's first step, the `Remaining` list must match the human's actions exactly, in any order. A click counts within 30 px. A grid click counts on the right tile. A drag counts when the grab is within 30 px and the piece lands within 20 px of where the human's landed. A box counts by overlap. Every number in this post is pages right out of pages scored.
+Metric. First-step plan right: on a page's first step, the `Remaining` list must match the human's actions exactly, in any order. A click counts within 30 px. A grid click counts on the right tile. A drag counts when the grab is within 30 px and the piece lands within 20 px of where the human's landed. A box counts by overlap. Every number in this post is pages right out of pages scored.
 
-**Noise.** This took me too long to take seriously.
+Noise. This took me too long to take seriously.
 
 - vLLM's bf16 numerics change with batching. Re-running the same weights greedily changed 98 of 225 answers by a coordinate digit, which is about ±2 points of noise from arithmetic alone.
 - A paired bootstrap over challenges put run-to-run differences at about ±6-8 points on the 151-397-page splits.
@@ -102,7 +93,7 @@ Much later I ran GRPO again from the best supervised model. Held-out score was 0
 
 ![Five reasoning formats on the old split, all reaching 65 of 151 new-family pages](fig1-format-plateau.png)
 
-_Figure 1. Five written-reasoning formats on the old split. (a) New question families, 151 pages. (b) Seen families, 207 pages. v5 at epoch 4, v8 at epoch 3 and v9 at epoch 2 each got exactly 65 of 151 new-family pages right._
+Figure 1. Five written-reasoning formats on the old split. (a) New question families, 151 pages. (b) Seen families, 207 pages. v5 at epoch 4, v8 at epoch 3 and v9 at epoch 2 each got exactly 65 of 151 new-family pages right.
 
 I tried five ways of writing the reasoning before the plan:
 
@@ -114,7 +105,7 @@ I tried five ways of writing the reasoning before the plan:
 | v8     | all objects, then a rule sentence, then verdicts  | 0.43 / 0.69     |
 | v9     | v8 with one `[x,y] -> verdict` line per object    | 0.43 / 0.62     |
 
-The formats changed _which_ pages were right, not _how many_. Of the 86 new-family misses, 51 were letter drags and hexagon shapes, two families with zero training pages. No format can fix that.
+The formats changed which pages were right, not how many. Of the 86 new-family misses, 51 were letter drags and hexagon shapes, two families with zero training pages. No format can fix that.
 
 A token count explained part of it. In one v8 epoch there were 304,523 supervised tokens. 42% described the scene, 46% were copied bookkeeping that reached near-zero loss after one epoch, and only 12% were the decision. The gradient was mostly memorising object names and positions.
 
@@ -122,10 +113,10 @@ A token count explained part of it. In one v8 epoch there were 304,523 supervise
 
 I spent a day on the vision side. Four results:
 
-- **Asking differently helps.** Asked directly to point at the loose letter on new-family drag pages, the model finds it on 37 of 39. Inside its trained reasoning, it grabs it on 22 of 39. It often invents a scene and then acts on the invention.
-- **The model's own vision tower is the best of 23 encoders.** I compared patch features with fixed rules and no training: is the drop spot the patch most like the piece; are the odd objects the least like the rest. Qwen's tower at three-quarter depth averaged 0.51, ahead of DINOv2 giant at 0.44. At its last layer it scored 0.26.
-- **Blur helps one family.** A 5 px Gaussian blur removes a grid overlay that hides faint letters. On those letters the tower went from 0.00 to 0.44. It makes holes worse.
-- **Size and resolution do not.** Four times the image tokens and the 8B model left the hard questions flat.
+- Asking differently helps. Asked directly to point at the loose letter on new-family drag pages, the model finds it on 37 of 39. Inside its trained reasoning, it grabs it on 22 of 39. It often invents a scene and then acts on the invention.
+- The model's own vision tower is the best of 23 encoders. I compared patch features with fixed rules and no training: is the drop spot the patch most like the piece; are the odd objects the least like the rest. Qwen's tower at three-quarter depth averaged 0.51, ahead of DINOv2 giant at 0.44. At its last layer it scored 0.26.
+- Blur helps one family. A 5 px Gaussian blur removes a grid overlay that hides faint letters. On those letters the tower went from 0.00 to 0.44. It makes holes worse.
+- Size and resolution do not. Four times the image tokens and the 8B model left the hard questions flat.
 
 One caveat came from the review. Qwen3-VL already feeds three intermediate vision layers into the language model, so "the last layer loses it" is too simple. The claim that survives is narrower: the information is in the vision features, and the language readout does not use it.
 
@@ -133,7 +124,7 @@ One caveat came from the review. Qwen3-VL already feeds three intermediate visio
 
 The independent review was blunt. The scoreboard could not show a win. Noise was about ±7 points, and a third of the new-family pages came from families with no training data. There was no evaluation on training pages, so underfitting and memorising looked the same. Weight decay and LoRA dropout were hard-coded to zero. And the earlier vision-LoRA run, at a learning rate of 2e-5, had moved the vision weights by only 0.37%. Training the eyes had never really been tested.
 
-So I re-split by challenge, 75/25 within every family, kept a fixed 100-page training sample in every evaluation, and trained on _plan-only_ completions with no written notes. Plan-only tied the written formats on shared pages (27 against 25-27 of 44) while being much shorter. From here every number is comparable.
+So I re-split by challenge, 75/25 within every family, kept a fixed 100-page training sample in every evaluation, and trained on plan-only completions with no written notes. Plan-only tied the written formats on shared pages (27 against 25-27 of 44) while being much shorter. From here every number is comparable.
 
 ## What moved the needle
 
@@ -141,7 +132,7 @@ So I re-split by challenge, 75/25 within every family, kept a fixed 100-page tra
 
 ![The same 310 held-out pages scored before and after more data](fig2-same-pages.png)
 
-_Figure 2. The same 310 held-out pages, scored by runs before and after 287 newly recorded challenges. With the same recipe, the new data (g1) beat the old-data control by 18-21 pages at epochs 2-5. The combined recipe (g2) added about 40 more._
+Figure 2. The same 310 held-out pages, scored by runs before and after 287 newly recorded challenges. With the same recipe, the new data (g1) beat the old-data control by 18-21 pages at epochs 2-5. The combined recipe (g2) added about 40 more.
 
 I recorded 287 more challenges. The new split kept every old held-out page held out, so old and new runs compare page for page. With the same recipe, g1 beat the old-data control at epochs 2, 3, 4 and 5 by 21, 19, 18 and 18 pages.
 
@@ -151,10 +142,10 @@ It was also unstable. On hexagon pages, g1's last five epochs scored 35, 25, 20,
 
 g2 changed four things at once:
 
-1. **Vision LoRA at 1e-4**, five times the earlier rate. This time the vision weights really moved.
-2. **A decision-weighted loss.** Each part of the completion is averaged on its own and weighted: the first-step plan ×2, the next action ×1, copies ×0.5, the answer ×0.5.
-3. **Soft coordinate digits** on the first step's `Remaining` line. A point a few pixels off is barely punished, and the exact human pixel is no longer worth memorising.
-4. **Cosine learning-rate decay** and **shift/scale augmentation**: half the pages shrunk to 80-100% and moved, every coordinate moved with them.
+1. Vision LoRA at 1e-4, five times the earlier rate. This time the vision weights really moved.
+2. A decision-weighted loss. Each part of the completion is averaged on its own and weighted: the first-step plan ×2, the next action ×1, copies ×0.5, the answer ×0.5.
+3. Soft coordinate digits on the first step's `Remaining` line. A point a few pixels off is barely punished, and the exact human pixel is no longer worth memorising.
+4. Cosine learning-rate decay and shift/scale augmentation: half the pages shrunk to 80-100% and moved, every coordinate moved with them.
 
 The soft digits are small. Each coordinate digit's target is a Gaussian over the ten digits, wide for units, narrow for tens, and exact for hundreds. This is from the trainer, with the input check removed:
 
@@ -179,7 +170,7 @@ for index, name in enumerate(DECISION_SEGMENTS):
 
 with `{"decision": 2.0, "next": 1.0, "copy": 0.5, "answer": 0.5}` and σ 2 for units, 0.5 for tens. Copied coordinates stay exact, because grading needs `Target` to equal an entry of `Remaining`.
 
-g2 rose steadily and stayed level: 0.630, 0.718, 0.793, 0.826, 0.834, 0.829, **0.844**, 0.841. The swings were gone. Letter drags went from 1-2 of 9 in the old runs to 17 of 29.
+g2 rose steadily and stayed level: 0.630, 0.718, 0.793, 0.826, 0.834, 0.829, 0.844, 0.841. The swings were gone. Letter drags went from 1-2 of 9 in the old runs to 17 of 29.
 
 Because the four changes went in together, I do not know which did most. Finding out means dropping one at a time, about 12 hours each.
 
@@ -201,21 +192,21 @@ The eyes learned to locate. By epoch 4, 97-98% of held-out targets were within o
 
 ![Held-out first-step plan accuracy per epoch for five runs](fig3-heldout-curves.png)
 
-_Figure 3. First-step plan right on the 397 held-out pages. g2, g3 and g4b peak at 335, 333 and 336: a one-to-three page spread. g3 got there faster (0.791 at epoch 2 against 0.718). g4c is at epoch 4 of 8._
+Figure 3. First-step plan right on the 397 held-out pages. g2, g3 and g4b peak at 335, 333 and 336: a one-to-three page spread. g3 got there faster (0.791 at epoch 2 against 0.718). g4c is at epoch 4 of 8.
 
-g3 peaked at 0.839 at epoch 4, two pages below g2. That is a tie. But the two models fail on different pages: each gets about 30 pages the other misses, and 364 of 397 (0.917) are right in at least one. The remaining errors are mostly _which_ and _how many_ targets to pick. Better eyes did not decide that.
+g3 peaked at 0.839 at epoch 4, two pages below g2. That is a tie. But the two models fail on different pages: each gets about 30 pages the other misses, and 364 of 397 (0.917) are right in at least one. The remaining errors are mostly which and how many targets to pick. Better eyes did not decide that.
 
 That is the point where a different readout started to look worth trying.
 
 ## The Jev idea
 
-**Jev** is TypeSafe's hosted decision model. You send a piece of text and a set of short questions (yes/no, pick one, a score). It reads the text once and answers every question from its hidden states, with calibrated probabilities and no generated text. **Kev** is Jared Palmer's open re-implementation ([github.com/jaredpalmer/kev](https://github.com/jaredpalmer/kev)), built from an outside reconstruction of Jev: a Qwen backbone, a LoRA adapter and a small pointer head.
+Jev is TypeSafe's hosted decision model. You send a piece of text and a set of short questions (yes/no, pick one, a score). It reads the text once and answers every question from its hidden states, with calibrated probabilities and no generated text. Kev is Jared Palmer's open re-implementation ([github.com/jaredpalmer/kev](https://github.com/jaredpalmer/kev)), built from an outside reconstruction of Jev: a Qwen backbone, a LoRA adapter and a small pointer head.
 
 Three ideas matter here:
 
-1. **Read once.** The shared input is processed one time and cached.
-2. **Questions cannot see each other.** Each question is a short branch that sees the shared input and its own tokens only, so adding a question does not change the others.
-3. **Answers are probabilities, not text.** The model can only pick from the options you give it.
+1. Read once. The shared input is processed one time and cached.
+2. Questions cannot see each other. Each question is a short branch that sees the shared input and its own tokens only, so adding a question does not change the others.
+3. Answers are probabilities, not text. The model can only pick from the options you give it.
 
 For a puzzle page, the shared input is the panel's image tokens plus the instruction and the previous actions. The questions become:
 
@@ -228,7 +219,7 @@ For a puzzle page, the shared input is the panel's image tokens plus the instruc
   └─ "Drop:"                pointer over patches: where it goes
 ```
 
-I made two choices that differ from Kev. The yes/no answer is read from the language model's _own_ `" yes"` and `" no"` token logits, renormalised over the two, rather than a new head. And the written plan is still trained in the same run, so every readout is compared with it on the same pages.
+I made two choices that differ from Kev. The yes/no answer is read from the language model's own `" yes"` and `" no"` token logits, renormalised over the two, rather than a new head. And the written plan is still trained in the same run, so every readout is compared with it on the same pages.
 
 The candidates differ by page type. A picture grid has nine fixed tile centres. A canvas uses the pointer head's 16 best peaks, spaced apart and refined to the centre of their local heat.
 
@@ -266,22 +257,22 @@ def _check_logprobs(policy, prefix, sequences, indices, verdicts, train):
 
 g4 is g3 plus the checks. After epoch 1, on the 242 held-out first steps whose plan is clicks:
 
-- **Grids:** checks 55 of 62, written plan 50.
-- **Canvas:** checks 95 of 180, written plan 146.
+- Grids: checks 55 of 62, written plan 50.
+- Canvas: checks 95 of 180, written plan 146.
 
-After epoch 2, grids were 59 of 62 for both. Canvas _fell_ to 52 of 180, while the written plan rose to 154. On 114 of the 180 canvas pages the checks chose too many targets. Training checks were about 99% right.
+After epoch 2, grids were 59 of 62 for both. Canvas fell to 52 of 180, while the written plan rose to 154. On 114 of the 180 canvas pages the checks chose too many targets. Training checks were about 99% right.
 
 ### A wrong diagnosis
 
-The first explanation was neat. In g4, a canvas training page got three kinds of candidates: the human's points with a little jitter (yes), raw head peaks (no) and random points (no). Each kind has its own coordinate pattern. So maybe the branches had learned to tell a candidate's _source_ from its numbers, which is useless on held-out pages where every candidate is a refined peak. I built the fix: make training candidates exactly the way held-out ones are made.
+The first explanation was neat. In g4, a canvas training page got three kinds of candidates: the human's points with a little jitter (yes), raw head peaks (no) and random points (no). Each kind has its own coordinate pattern. So maybe the branches had learned to tell a candidate's source from its numbers, which is useless on held-out pages where every candidate is a refined peak. I built the fix: make training candidates exactly the way held-out ones are made.
 
 Then I looked at where the wrong yeses actually were.
 
 ![Distance from wrongly passed candidates to the nearest target, and canvas pages right by epoch](fig4-rim-failure.png)
 
-_Figure 4. (a) g4 at epoch 2: of 988 wrongly passed canvas candidates, 898 sat within 60 px of a real target, mostly 30-60 px away. Only 50 were more than 90 px away. (b) Canvas pages right. g4 used candidates 40 px apart and merged passing points within 45 px. g4b used 60 px spacing, left the rim band out of training and merged within 75 px._
+Figure 4. (a) g4 at epoch 2: of 988 wrongly passed canvas candidates, 898 sat within 60 px of a real target, mostly 30-60 px away. Only 50 were more than 90 px away. (b) Canvas pages right. g4 used candidates 40 px apart and merged passing points within 45 px. g4b used 60 px spacing, left the rim band out of training and merged within 75 px.
 
-A source shortcut would produce yeses anywhere. These were not anywhere. Almost all were 30-60 px from a target: the edge of the _same_ object. With candidates 40 px apart and passing points merged only within 45 px, one object gave two or three yeses, and each became a separate click. The model was not wrong that the object was a target. The readout counted it twice.
+A source shortcut would produce yeses anywhere. These were not anywhere. Almost all were 30-60 px from a target: the edge of the same object. With candidates 40 px apart and passing points merged only within 45 px, one object gave two or three yeses, and each became a separate click. The model was not wrong that the object was a target. The readout counted it twice.
 
 Re-scoring g4's saved epoch-2 branches with only a 75 px merge lifts canvas from 52 to about 97 of 180, with no retraining.
 
@@ -333,7 +324,7 @@ After epoch 4 of 8, the count is right on 176 of 180 canvas pages (98%) but only
 
 ![Checks against the written plan on grids and canvas, and how often the checks pass the plan's points](fig5-checks-vs-written.png)
 
-_Figure 5. (a, b) Checks against the written plan on the same held-out first steps. Grids: the checks match or beat the plan at every epoch, and g4c reaches 60 of 62. Canvas: the checks peak at 151 of 180 (g4b, epoch 4) while the plan holds 155-158 from epoch 4. (c) On g4b's epoch-7 checkpoint, the checks pass 398 of 399 of the plan's correct canvas points and 14 of its 19 wrong ones._
+Figure 5. (a, b) Checks against the written plan on the same held-out first steps. Grids: the checks match or beat the plan at every epoch, and g4c reaches 60 of 62. Canvas: the checks peak at 151 of 180 (g4b, epoch 4) while the plan holds 155-158 from epoch 4. (c) On g4b's epoch-7 checkpoint, the checks pass 398 of 399 of the plan's correct canvas points and 14 of its 19 wrong ones.
 
 On picture grids the checks are level with or above the written plan at every epoch, 58 of 62 from epoch 4 on and 60 of 62 in g4c. A grid is the ideal case: nine fixed candidates, no localisation, one yes/no each.
 
@@ -349,7 +340,7 @@ So the yes/no readout and the written plan come from the same beliefs. When the 
 
 ![Grab and landing error distributions for drag where-questions](fig6-drag-errors.png)
 
-_Figure 6. Drag "where" questions on 110 held-out single-drag pages (g4f, still training). (a) Grab error: 87 of 110 within the 30 px grab radius at epoch 1, 76 at epoch 2. (b) Landing error: 44 of 110 within 20 px at both epochs._
+Figure 6. Drag "where" questions on 110 held-out single-drag pages (g4f, still training). (a) Grab error: 87 of 110 within the 30 px grab radius at epoch 1, 76 at epoch 2. (b) Landing error: 44 of 110 within 20 px at both epochs.
 
 A drop spot, like a faint hole, is hard to list as candidates in advance. So for drags g4f asks two pointer questions, `Piece:` and `Drop:`. Each is a short branch whose last token becomes the pointer head's query over every image patch (from the trainer, trimmed):
 
@@ -387,35 +378,35 @@ g4e adds a blurred copy of the panel as a second image, aimed at the faint lette
 
 ## Lessons
 
-1. **Fix the scoreboard before tuning anything.** For days the main number could not move: noise larger than any effect, a third of the pages unlearnable, no training-set eval. After the re-split and page-by-page comparisons, every later decision was readable.
-2. **Format changes move which pages are right, not how many.** Five formats, one ceiling. Plan-only matched them all.
-3. **Data was the first real lever; loss placement was the second.** Same recipe, more pages: +18 to +22 on identical pages. Then weighting the 12% of tokens that are the decision went with the jump to 0.844.
-4. **The eyes saw more than the words used, but better eyes alone did not fix the plan.** The pointing loss made localisation 97% right and left the plan level.
-5. **A readout needs a notion of "one object".** The first Jev version's yeses were mostly right about the object and wrong about the count, because one object offered three candidates.
-6. **Check a diagnosis against the distribution before building the fix.** The coordinate-shortcut story was plausible and had code behind it. One histogram ruled it out.
-7. **A cleaner readout does not add knowledge.** The checks inherit the written plan's beliefs, 398 of 399 and 14 of 19. They fix readout errors, not perception errors.
-8. **What helps one page type can hurt another.** The count question helps canvas and hurts grids. Per-type recipes beat one global rule.
-9. **Bundled changes give results, not explanations.** g2 worked, and I still cannot say why.
-10. **A tie is a tie.** 336, 335 and 333 of 397 are the same model quality.
+1. Fix the scoreboard before tuning anything. For days the main number could not move: noise larger than any effect, a third of the pages unlearnable, no training-set eval. After the re-split and page-by-page comparisons, every later decision was readable.
+2. Format changes move which pages are right, not how many. Five formats, one ceiling. Plan-only matched them all.
+3. Data was the first real lever; loss placement was the second. Same recipe, more pages: +18 to +22 on identical pages. Then weighting the 12% of tokens that are the decision went with the jump to 0.844.
+4. The eyes saw more than the words used, but better eyes alone did not fix the plan. The pointing loss made localisation 97% right and left the plan level.
+5. A readout needs a notion of "one object". The first Jev version's yeses were mostly right about the object and wrong about the count, because one object offered three candidates.
+6. Check a diagnosis against the distribution before building the fix. The coordinate-shortcut story was plausible and had code behind it. One histogram ruled it out.
+7. A cleaner readout does not add knowledge. The checks inherit the written plan's beliefs, 398 of 399 and 14 of 19. They fix readout errors, not perception errors.
+8. What helps one page type can hurt another. The count question helps canvas and hurts grids. Per-type recipes beat one global rule.
+9. Bundled changes give results, not explanations. g2 worked, and I still cannot say why.
+10. A tie is a tie. 336, 335 and 333 of 397 are the same model quality.
 
 ## What is next
 
-- **Use each readout where it wins.** Checks for grids, the written plan for canvas and boxes, and both for drags, since they fail on different pages (61-64 of 110 right in either).
-- **Land drags more precisely.** Refine around the drop peak at a finer scale than one patch.
-- **A pick-one question.** One softmax across all candidates, as Kev does for choice questions, for pages with exactly one answer.
-- **A routing question,** so the model says which recipe a page needs instead of me deciding.
-- **Unseen families.** 3-9 of 18 at best, across every run. This is the open problem, and none of the above targets it directly.
-- **Seeds.** Run-to-run variance is estimated by bootstrap, not measured with repeated seeds. Repeated seeds would turn the estimate into a measurement.
+- Use each readout where it wins. Checks for grids, the written plan for canvas and boxes, and both for drags, since they fail on different pages (61-64 of 110 right in either).
+- Land drags more precisely. Refine around the drop peak at a finer scale than one patch.
+- A pick-one question. One softmax across all candidates, as Kev does for choice questions, for pages with exactly one answer.
+- A routing question, so the model says which recipe a page needs instead of me deciding.
+- Unseen families. 3-9 of 18 at best, across every run. This is the open problem, and none of the above targets it directly.
+- Seeds. Run-to-run variance is estimated by bootstrap, not measured with repeated seeds. Repeated seeds would turn the estimate into a measurement.
 
 ## Mistakes worth admitting
 
-- **The wrong diagnosis above.** The fix for the wrong cause was already built and queued when the histogram showed the real one.
-- **Calling a deficit real.** g4b's written plan trailed g3 at epochs 1-2. I said it looked like interference from the checks. By epoch 3 the gap was gone (205 against 206 on the same pages).
-- **A stale code copy.** One run trained the wrong format with a too-short token cap, truncating about 30% of first steps. The review caught it.
-- **Understated noise.** I first quoted ±4 points. It is ±6-8.
-- **A false gain.** I claimed a drag improvement from 34% to 48% that compared different pages.
-- **A misdescribed family.** I called one held-out family unseen. It was the same hexagon puzzle as training pages.
-- **An unwatched run.** RL run 3 spent eight rollouts on NaN weights because its only watchdog had exited.
+- The wrong diagnosis above. The fix for the wrong cause was already built and queued when the histogram showed the real one.
+- Calling a deficit real. g4b's written plan trailed g3 at epochs 1-2. I said it looked like interference from the checks. By epoch 3 the gap was gone (205 against 206 on the same pages).
+- A stale code copy. One run trained the wrong format with a too-short token cap, truncating about 30% of first steps. The review caught it.
+- Understated noise. I first quoted ±4 points. It is ±6-8.
+- A false gain. I claimed a drag improvement from 34% to 48% that compared different pages.
+- A misdescribed family. I called one held-out family unseen. It was the same hexagon puzzle as training pages.
+- An unwatched run. RL run 3 spent eight rollouts on NaN weights because its only watchdog had exited.
 
 ## References
 
@@ -425,4 +416,4 @@ g4e adds a blurred copy of the panel as a second image, aimed at the faint lette
 - Shao et al., 2024. DeepSeekMath (GRPO). [arXiv:2402.03300](https://arxiv.org/abs/2402.03300).
 - Oquab et al., 2023. DINOv2. [arXiv:2304.07193](https://arxiv.org/abs/2304.07193).
 
-_Figures: PNG at 2× and SVG. All numbers are pages right out of pages scored, from held-out pages no run trained on._
+Figures: PNG at 2× and SVG. All numbers are pages right out of pages scored, from held-out pages no run trained on.
