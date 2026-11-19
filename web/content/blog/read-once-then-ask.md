@@ -38,11 +38,15 @@ If you've done an hCaptcha recently, you've probably noticed that the puzzle typ
 
 ## Setup
 
+### Terms, model and data
+
 A few terms first. A page is one screen of a challenge, and each action on it is a step. A family is a question type, such as "drinks that can be hot or cold". Held-out pages are never trained on. A new-family page comes from a type with no training examples at all, and a seen-family page is a new puzzle of a type the model did train on.
 
 The model is Qwen3-VL-4B-Instruct, a 4-billion-parameter vision-language model. I ran it in bf16 (16-bit) precision and fine-tuned it with LoRA adapters, which are small trainable add-on weights that leave the base model frozen. It fits on a single 16 GB GPU, and a small model makes experiments cheap, so I could find out what works before paying for a bigger one.
 
 For data, I built a recorder that logs every click, drag and box a person makes, lined up frame by frame with what was on screen. Each solved challenge is one episode. I started with about a thousand and ended with 1,368.
+
+### What the model writes
 
 For most of the project the model wrote three short lines and then its action. I call this the written plan:
 
@@ -53,8 +57,6 @@ Target: {...}       the next action
 ```
 
 The training targets for these lines come straight from the person's recorded actions, so they are right by construction. The first reinforcement learning runs used free-form reasoning instead, and by the end the model writes nothing at all (see [The Jev idea](#the-jev-idea)).
-
-I used two scores. Step accuracy, which only appears in the reinforcement learning section, asks whether one next action is a valid move given what has already been done on the page. Everything after that uses a stricter score, first-step plan right: on a page's first step, the Remaining list has to match the person's actions exactly, in any order. A click counts within 30 px, and a grid click counts on the right tile. A drag counts when the grab is within 30 px and the piece lands within 20 px of where the person's landed. A box counts when it overlaps the person's box by at least half (IoU ≥ 0.5).
 
 ![One recorded episode: "Find drinks that can be hot or cold." The person clicked the coffee cup, the mug and the glass, then submitted.](episode-example.png)
 
@@ -83,7 +85,11 @@ Remaining: []
 Target: {"op":"submit"}
 ```
 
-The `<answer>` line repeats Target, so I've left it off steps 2 to 4. Step 1 is the one the score counts, because its Remaining list is the whole plan for the page. From step 2 on, the points still to do are written a few pixels off the person's clicks (up to 25 px), so the model has to recognize what is already done by looking at the page instead of copying numbers from the history.
+The `<answer>` line repeats Target, so I've left it off steps 2 to 4. Step 1 is the one that gets scored (below), because its Remaining list is the whole plan for the page. From step 2 on, the points still to do are written a few pixels off the person's clicks (up to 25 px), so the model has to recognize what is already done by looking at the page instead of copying numbers from the history.
+
+### How it's scored
+
+I used two scores. Step accuracy, which only appears in the reinforcement learning section, asks whether one next action is a valid move given what has already been done on the page. Everything after that uses a stricter score, first-step plan right: on a page's first step, the Remaining list has to match the person's actions exactly, in any order. A click counts within 30 px, and a grid click counts on the right tile. A drag counts when the grab is within 30 px and the piece lands within 20 px of where the person's landed. A box counts when it overlaps the person's box by at least half (IoU ≥ 0.5).
 
 The scores are also noisy, and it helps to know by how much before comparing two runs. Re-running the same weights with greedy decoding changed 98 of 225 answers by a coordinate digit, because vLLM's bf16 arithmetic shifts slightly with batching. That alone is worth about ±2 points. A paired bootstrap over challenges put run-to-run differences at about ±6 to 8 points on the original test sets (151 and 207 pages), and neighboring epochs of one run moved by up to 9 pages even in stable runs. I don't count a gain of a few points as real.
 
@@ -179,31 +185,43 @@ Looking at the picture was quick. By the time the model started writing, it had 
 
 I was complaining about this to a friend, and they told me to look at system one decision models like Jev. The term comes from Kahneman's two kinds of thinking. System two is slow and deliberate, and system one is the quick gut answer you give without talking yourself through it. My written plan was pure system two, narrating every page before touching it, and a captcha needs system one: look once and answer.
 
-### What Jev is
+### How Jev works
 
-Jev is TypeSafe's hosted decision model. You send it a piece of text and a few short questions (yes/no, pick one, a score). It reads the text once and answers every question straight from its hidden states, with calibrated probabilities and no generated text. Kev is Jared Palmer's open re-implementation ([github.com/jaredpalmer/kev](https://github.com/jaredpalmer/kev)), built from an outside reconstruction of Jev: a Qwen backbone, a LoRA adapter and a small pointer head.
+Jev is TypeSafe's hosted decision model. You send it a piece of text and a few short questions, and it answers every question with a calibrated probability and no generated text. Jev itself is only available as a service, so I worked from Kev, Jared Palmer's open re-implementation ([github.com/jaredpalmer/kev](https://github.com/jaredpalmer/kev)), which is built from Archer Hume's outside reconstruction of Jev. A Kev checkpoint is a Qwen base model, a LoRA adapter and a small pointer head.
 
-Its design carries straight over to puzzles. The shared input is read once and cached. Each question is a short branch that sees that input and its own tokens but none of the other questions, so adding a question doesn't change the other answers. And every answer is a probability over options you supply, so the model can only pick one of them.
+Kev puts the shared text and every question into one token sequence:
 
-I built my own version for puzzle pages and called it TEV. The shared input is the panel's image tokens, the instruction and the actions so far, and everything the model has to decide becomes a short question that branches off that one cached reading.
+```text
+<state> …state…
+<q> instructions <opt> option 1 </opt> <opt> option 2 </opt> … <decide>
+<q> instructions <opt> option 1 </opt> <opt> option 2 </opt> … <decide>
+```
 
-![How TEV answers a page: one pass reads it, short questions branch off the cache](fig-tev-diagram.png "Figure 6. How TEV answers a page. One pass reads the screenshot and caches it. Each short question branches off that cache: the words (which action, how many, yes or no) come from next-word probabilities, and the places come from the pointer head. A small planner turns the readouts into mouse actions, and no text is generated. This is the version I ran live at the end; the Action question and the box corners came after the first versions below.")
+The attention mask lets each question's tokens read the shared text and their own question, but not the other questions. The text is processed once and cached, and adding a question never changes another question's answer.
 
-I made two choices that differ from Kev. The yes/no answer is read from the language model's own `" yes"` and `" no"` token probabilities, renormalized over the two, instead of from a new head. And the written plan is still trained in the same run, so I can compare every readout against it on the same pages.
+Every question is a list of options, yes/no included. A yes/no question is two options, false and true. A pick-one question can have up to 255, and a rating question has one option per level. The pointer head chooses among them, and it works like a single attention head. The question's last token, `<decide>`, comes after all the options and can read them, so its hidden state is the query. Each option's closing `</opt>` hidden state is a key. Both are projected down to 256 numbers, every option gets the score `q · k / √256`, and a softmax over the options turns the scores into probabilities. A yes/no answer is p(true). Each checkpoint also stores a temperature that divides the scores, which calibrates the probabilities without changing which option wins. Training is plain cross-entropy on the right option, with the adapter and the head trained together.
+
+### TEV: the same idea on a puzzle page
+
+I built my own version for puzzle pages and called it TEV. The shared text becomes the panel's image tokens, the instruction and the actions so far, read once and cached, and everything the model has to decide becomes a short question that branches off that one reading.
+
+![How TEV answers a page: one pass reads it, short questions branch off the cache](fig-tev-diagram.png "Figure 6. How TEV answers a page. One pass reads the screenshot and caches it. Each short question branches off that cache: the words (which action, how many, yes or no) come from next-word probabilities, and the places come from the pointer head. A small planner turns the readouts into mouse actions, and no text is generated. This is the version I ran live at the end; the Action question and the box corners came after the first versions in the next section.")
+
+I changed two things from Kev. For "where" questions, the options are the 440 image patches of the screenshot instead of option tokens, so the same kind of pointer head picks a patch instead of a phrase. And the word answers don't go through the pointer head at all. "Action:", "How many:" and the yes/no checks read the language model's own next-word probabilities (over click, drag and box, over the digits 0 to 9, and " yes" against " no"), each renormalized over its options. I also kept training the written plan in the same run, so I can compare every readout with it on the same pages.
 
 ### Pointing with a query and a key
 
-Words are easy to read out, because a language model already has a probability for every possible next word. "Action:" asks which of click, drag and box it thinks comes next, and "How many:" asks the same thing over the digits 0 to 9. Places are harder. Writing "x=412, y=230" out as text was the slow part I wanted to get rid of.
+Words are easy to read out this way, because a language model already has a probability for every possible next word. Places are harder. Writing "x=412, y=230" out as text was the slow part I wanted to get rid of, so places go through the pointer head.
 
-For places, TEV borrows how attention works. Inside a transformer, every token makes a query vector and a key vector, and the dot product of one token's query with another token's key decides how much the first looks at the second. A dot product is biggest when two vectors point the same way, so whichever key is closest to the query wins.
+The pointer head borrows how attention works. Inside a transformer, every token makes a query vector and a key vector, and the dot product of one token's query with another token's key decides how much the first looks at the second. A dot product is biggest when two vectors point the same way, so whichever key is closest to the query wins. Kev uses this to pick an option, and TEV uses it to pick a spot on the page.
 
-The pointing head from g3 is one more head of that shape. Its query `q` is the hidden state of the question's last token, say the token for "Top-left:", at layer 18. Its keys `k_i` are the hidden states of the 440 image patches at the same layer, each covering about 25 px of the panel. Both are normalized and squeezed down to 256 numbers by a small learned matrix, and every patch gets a score:
+The pointing head from g3 has the same shape as Kev's, with the image patches as the options. Its query `q` is the hidden state of the question's last token, say the token for "Top-left:", at layer 18. Its keys `k_i` are the hidden states of the 440 image patches at the same layer, each covering about 25 px of the panel. Both are normalized and squeezed down to 256 numbers by a small learned matrix, and every patch gets a score:
 
 ```text
 score_i = (W_q · q) · (W_k · k_i) / √256
 ```
 
-A softmax over the 440 scores turns them into a heat map over the page. A normal attention head would use those weights to blend information from the patches. Here the weights are the answer, showing where the model looks when you ask it for "Top-left", and the hottest patch is the point.
+A softmax over the 440 scores turns them into a heat map over the page. A normal attention head would use those weights to blend information from the patches. Here, as in Kev, the weights are the answer, showing where the model looks when you ask it for "Top-left", and the hottest patch is the point.
 
 Training it was almost boring. For every human demonstration the target is a small soft blob, about one patch wide, centered on the point the person actually used, and the loss is the cross-entropy between that blob and the heat map. The head starts out nearly flat (its query weights begin 100 times smaller than its keys), so bolting it on changes nothing until it has learned something.
 
@@ -211,7 +229,7 @@ Training it was almost boring. For every human demonstration the target is a sma
 
 ### Yes/no checks
 
-A click question can have one right answer or five, so one pointer isn't enough. TEV makes a short list of candidate spots and asks about each one, "Check [x,y] ->", read as the probability of " yes" against " no". A picture grid has nine fixed tile centers. A canvas uses the pointer head's 16 best peaks, spaced apart and refined to the center of their local heat.
+A click question can have one right answer or five, so one pointer isn't enough. TEV makes a short list of candidate spots and asks about each one, "Check [x,y] ->", read as the probability of " yes" against " no". Each check is its own question in Kev's sense: a branch that sees the page but none of the other checks. A picture grid has nine fixed tile centers. A canvas uses the pointer head's 16 best peaks, spaced apart and refined to the center of their local heat.
 
 The training labels come from the person's actions, so none of this needed new labeling. A candidate near a click is a yes, the number of clicks is the count, and the grab and drop points answer the drag questions.
 
@@ -245,6 +263,12 @@ On one live page (Figure 8), eight of the sixteen candidates landed on the globe
 
 ![One live click decision: 16 candidate spots, 8 yes, all on the globe](fig-readout.png "Figure 8. One live click decision, \"Identify the item that spins in a circle.\" (a) The 16 candidate spots. The 8 that said yes all sit on the globe, and one click was played. (b) p(yes) for each spot, sorted. Action said click with p = 1.00 and How many said 1. No text was generated.")
 
+### Drags
+
+A drag needs two places, the piece and where it goes, so TEV asks two pointer questions, "Piece:" and "Drop:". They work like "Top-left:" and are trained the same way, toward the point where the person grabbed the piece and the point where they let go.
+
+One peak from each isn't enough. Some pages ask for two drags ("Drag the TWO shapes to their matching outlines"), and the strongest peak isn't always the right one. So the final version handles drags the way it handles clicks. The two heat maps propose up to 6 pieces and 8 places, and every piece-and-place pair gets its own yes/no question, "Move [x1,y1] to [x2,y2] ->". A pair is labeled yes when it would pass the same test the score uses: a grab within 30 px of the person's, and the piece landing within 20 px of where theirs landed. Pairs that come close without passing are left out of training. The no examples favor the hard cases: the right piece in the wrong place, or the wrong piece aimed at the right place. At decision time TEV plays the pairs that pass, uses "How many:" to tell one drag from two, and uses each piece and each place only once.
+
 ### Was it actually faster?
 
 Yes, by a lot. In the live runs at the end of the project, the median challenge went from 12.4 seconds of model time to 1.2, about ten times faster, and each decision went from 5.0 seconds to 0.72.
@@ -271,7 +295,7 @@ After those fixes the checks matched or beat the written plan on grids at every 
 
 ## References
 
-- Kev, an open re-implementation of the Jev decision model: [github.com/jaredpalmer/kev](https://github.com/jaredpalmer/kev). TypeSafe's Jev and its System One API are described in TypeSafe's documentation; the outside reconstruction Kev is built on is Archer Hume's "Jev's Architecture Unmasked".
+- Kev, an open re-implementation of the Jev decision model: [github.com/jaredpalmer/kev](https://github.com/jaredpalmer/kev). TypeSafe's Jev and its System One API are described in TypeSafe's documentation; the outside reconstruction Kev is built on is Archer Hume's ["Jev's Architecture Unmasked"](https://archerhume.com/posts/jevs-architecture-unmasked).
 - Qwen3-VL-4B-Instruct: [huggingface.co/Qwen/Qwen3-VL-4B-Instruct](https://huggingface.co/Qwen/Qwen3-VL-4B-Instruct).
 - Hu et al., 2021. LoRA: Low-Rank Adaptation of Large Language Models. [arXiv:2106.09685](https://arxiv.org/abs/2106.09685).
 - Shao et al., 2024. DeepSeekMath (GRPO). [arXiv:2402.03300](https://arxiv.org/abs/2402.03300).
