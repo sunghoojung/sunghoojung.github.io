@@ -18,9 +18,8 @@ tags:
 3. [What plateaued](#what-plateaued)
 4. [What moved the needle](#what-moved-the-needle)
 5. [The Jev idea](#the-jev-idea)
-6. [TEV versions, and how the first one failed](#tev-versions-and-how-the-first-one-failed)
-7. [Findings](#findings)
-8. [References](#references)
+6. [Is reading it out as accurate?](#is-reading-it-out-as-accurate)
+7. [References](#references)
 
 ## Why captchas
 
@@ -33,7 +32,7 @@ I picked hCaptcha because it keeps rolling out new kinds of puzzles that take a 
 - Drags: move a piece to where it fits, such as "Drag the letter to the place where it fits."
 - Boxes: "Please draw a box around the object that is different."
 
-If you've done an hCaptcha recently, you've probably noticed that the puzzle types keep changing, which is exactly what broke the old CNN approach. I wanted a model that learns them from a few examples and copes with the new ones.
+If you've done an hCaptcha recently, you've probably noticed that the puzzle types keep changing, which is exactly what broke the old CNN approach.
 
 ![Example of a drag challenge](pasted-20261119182822.png)
 
@@ -86,7 +85,7 @@ Target: {"op":"submit"}
 
 The `<answer>` line repeats Target, so I've left it off steps 2 to 4. Step 1 is the one the score counts, because its Remaining list is the whole plan for the page. From step 2 on, the points still to do are written a few pixels off the person's clicks (up to 25 px), so the model has to recognize what is already done by looking at the page instead of copying numbers from the history.
 
-The scores are also noisy, and it helps to know by how much before comparing two runs. Re-running the same weights with greedy decoding changed 98 of 225 answers by a coordinate digit, because vLLM's bf16 arithmetic shifts slightly with batching. That alone is worth about ±2 points. A paired bootstrap over challenges put run-to-run differences at about ±6 to 8 points on the 151- and 207-page test sets, and neighboring epochs of one run moved by up to 9 pages even in stable runs. I don't count a gain of a few points as real.
+The scores are also noisy, and it helps to know by how much before comparing two runs. Re-running the same weights with greedy decoding changed 98 of 225 answers by a coordinate digit, because vLLM's bf16 arithmetic shifts slightly with batching. That alone is worth about ±2 points. A paired bootstrap over challenges put run-to-run differences at about ±6 to 8 points on the original test sets (151 and 207 pages), and neighboring epochs of one run moved by up to 9 pages even in stable runs. I don't count a gain of a few points as real.
 
 ## What plateaued
 
@@ -140,13 +139,13 @@ With blur, the tower's last layer went from 0.00 to 0.44 on the faint letters, a
 
 Fourth, more pixels and a bigger model didn't help. With four times the image tokens, "where it fits" was 3 of 39, and an untrained 8B model got 4. Overall scores at 1×, 2× and 4× tokens were nearly identical.
 
-One caveat came out of the review in the next section. Qwen3-VL already feeds three intermediate vision layers into the language model, so "the last layer loses it" is too simple. The safer claim is that the vision features contain the information and the language side doesn't make full use of it.
+One caveat came out of the review described in the next section. Qwen3-VL already feeds three intermediate vision layers into the language model, so "the last layer loses it" is too simple. The safer claim is that the vision features contain the information and the language side doesn't make full use of it.
 
 ## What moved the needle
 
 ### Fixing the scoreboard first
 
-After the formats plateaued, I had a separate agent review my method. I gave it read-only access and none of my conclusions, and it found two problems. A third of the "new family" test pages came from two families with no training pages at all, so no change could ever help them. I also wasn't scoring any training pages, which made memorizing look the same as not learning.
+After the formats plateaued, I had a separate AI agent review my method. I gave it read-only access and none of my conclusions, and it found two problems. A third of the "new family" test pages came from two families with no training pages at all, so no change could ever help them. I also wasn't scoring any training pages, which made memorizing look the same as not learning.
 
 So I re-split the data by challenge, 75/25 within every family. Test pages became new puzzles from families the model had trained on, which means the new numbers compare with the old seen-family score (about 0.69), not the new-family 0.43. I also scored a fixed sample of 100 training pages every epoch and switched to plan-only output: just the three lines and the action, with no written reasoning. Plan-only scored the same as the written formats, so the reasoning text wasn't adding anything.
 
@@ -158,9 +157,9 @@ After that, three changes moved the held-out score, in this order.
 
 By now I had 1,082 training pages and 397 held-out pages. Every challenge held out before stayed held out, so old and new runs can be compared on the same pages. The first run, g1, used the same recipe on the bigger data. On the 310 test pages both runs shared, it got 18 to 21 more pages right than the old data at every epoch from 2 to 5, and the best scores were 223 against 211. Families that had no training pages before now had some, and they started to work. Hexagon puzzles went from 5 of 48 to 35 with 56 training pages instead of none. g1 was unstable, though. Its hexagon score went 5, 19, 31, 35, 25, 20, 38, 13 across epochs, and the overall score swung from 0.72 to 0.60 and back. A constant learning rate was too jumpy for this data.
 
-### A better loss and a schedule
+### Four changes at once
 
-g2 changed four things at once. The loss counted the decision (the Remaining list) four times as much as the bookkeeping copied from earlier lines, and coordinates got soft targets, so a guess 1 pixel off cost less than one 100 pixels off. The vision tower was trained too, with its own LoRA at a learning rate of 1e-4. The learning rate followed a cosine schedule down to zero instead of staying constant. And half the training images were resized and moved, with their coordinates adjusted to match, so the model couldn't memorize where things sit.
+g2's loss counted the decision (the Remaining list) four times as much as the bookkeeping copied from earlier lines, and coordinates got soft targets, so a guess 1 pixel off cost less than one 100 pixels off. The vision tower was trained too, with its own LoRA at a learning rate of 1e-4. The learning rate followed a cosine schedule down to zero instead of staying constant. And half the training images were resized and moved, with their coordinates adjusted to match, so the model couldn't memorize where things sit.
 
 g2 climbed steadily to 0.844 (335 of 397), the best written-plan score up to then, and letter drags went from 12 to 17 of 29. Because all four changes landed together, I can't say which one did it.
 
@@ -240,9 +239,9 @@ def _check_logprobs(policy, prefix, sequences, indices, verdicts, train):
     return torch.log_softmax(two.float(), dim=-1)
 ```
 
-`prefix` holds the prompt's cached keys and values. Each branch is its own row in the batch, so branches can't attend to each other. The `digits` argument reuses the soft-digit readout path with two token ids instead of ten, and the loss is a two-way cross-entropy against the label.
+`prefix` holds the prompt's cached keys and values. Each branch is its own row in the batch, so branches can't attend to each other. The `digits` argument reuses the code that reads digit probabilities for coordinates, with two token ids instead of ten, and the loss is a two-way cross-entropy against the label.
 
-On one live page (Figure 8), eight of the sixteen candidates landed on the globe and came back yes at about 1.0, and the other eight came back at 0.01 or less. Eight yeses on one object is a problem I walked straight into with the first version (next section), and it's why TEV merges nearby yeses and asks "How many:". The count said 1, so it played one click.
+On one live page (Figure 8), eight of the sixteen candidates landed on the globe and came back yes at about 1.0, and the other eight came back at 0.01 or less. Eight yeses on one object is a problem I walked straight into with the first version (next section), which is why TEV merges nearby yeses and asks "How many:". The count said 1, so it played one click.
 
 ![One live click decision: 16 candidate spots, 8 yes, all on the globe](fig-readout.png "Figure 8. One live click decision, \"Identify the item that spins in a circle.\" (a) The 16 candidate spots. The 8 that said yes all sit on the globe, and one click was played. (b) p(yes) for each spot, sorted. Action said click with p = 1.00 and How many said 1. No text was generated.")
 
@@ -254,125 +253,21 @@ Yes, by a lot. In the live runs at the end of the project, the median challenge 
 
 I only timed 15 live challenges on the written plan, so treat that number as rough. Still, the two clouds don't overlap at all: the written plan's fastest challenge took longer than TEV's slowest.
 
-Speed was the reason I started, but I still had to find out whether reading answers out is as accurate as writing them. The next two sections are me finding that out the hard way.
+Speed was the reason I started, but I still had to find out whether reading answers out is as accurate as writing them. The next section is me finding that out the hard way.
 
-## TEV versions, and how the first one failed
+## Is reading it out as accurate?
 
-Every version below is trained together with the written plan, so each readout is compared with the plan on the same held-out pages.
+The first version, g4, added the yes/no checks to g3. It went well on picture grids and badly on canvas. After two epochs the checks got 59 of 62 grids, level with the written plan, but only 52 of 180 canvas pages against the plan's 154, and on 114 of those canvas pages they clicked too many targets. On training pages they were about 99% right, so something wasn't carrying over.
 
-### g4: grids worked, canvas collapsed
+My first guess was a shortcut. In training, the yes candidates were the person's own points and the no candidates were head peaks and random points, so maybe the model had learned to tell them apart by their coordinates instead of by looking. I built a fix for that before checking. Then I plotted where the wrong yeses actually were.
 
-g4 is g3 plus the yes/no checks. After epoch 1, on the 242 held-out first steps whose answer is clicks, the checks got 55 of 62 grids against the written plan's 50, and 95 of 180 canvas pages against its 146.
+![Distance from wrongly passed candidates to the nearest target, and canvas pages right by epoch](fig4-rim-failure.png "Figure 10. (a) g4 at epoch 2: of 988 wrongly passed canvas candidates, 898 sat within 60 px of a real target, mostly 30 to 60 px away. Only 50 were more than 90 px away. (b) Canvas pages right by epoch. g4 placed candidates 40 px apart and merged yeses within 45 px. g4b placed them 60 px apart, left the points 30 to 75 px from a target out of training, and merged within 75 px.")
 
-After epoch 2, grids were 59 of 62 for both. Canvas _fell_ to 52 of 180, while the written plan rose to 154. On 114 of the 180 canvas pages the checks chose too many targets, even though they were about 99% right on training pages.
-
-### A wrong diagnosis
-
-The first explanation I came up with was neat. In g4, a canvas training page got three kinds of candidates: the person's points with a little jitter (yes), raw head peaks (no) and random points (no). Each kind has its own coordinate pattern, so maybe the branches had learned to tell a candidate's _source_ from its numbers, which is useless on held-out pages where every candidate is a refined peak. I built the fix, which made training candidates exactly the way held-out ones are made.
-
-Then I looked at where the wrong yeses actually were.
-
-![Distance from wrongly passed candidates to the nearest target, and canvas pages right by epoch](fig4-rim-failure.png "Figure 10. (a) g4 at epoch 2: of 988 wrongly passed canvas candidates, 898 sat within 60 px of a real target, mostly 30 to 60 px away. Only 50 were more than 90 px away. (b) Canvas pages right. g4 used candidates 40 px apart and merged passing points within 45 px. g4b used 60 px spacing, left the rim band out of training and merged within 75 px.")
-
-A source shortcut would put wrong yeses anywhere on the page. Almost all of these were 30 to 60 px from a target, on the edge of the _same_ object. With candidates 40 px apart and passing points merged only within 45 px, one object gave two or three yeses, and each became a separate click. The model was right that the object was a target, and the readout counted it more than once.
-
-Re-scoring g4's saved epoch-2 answers with only a 75 px merge lifts canvas from 52 to about 97 of 180, with no retraining.
-
-### g4b: one candidate per object
-
-g4b keeps the peak-made training candidates and adds the fix the data called for. In the settings below, `nms_px` is the spacing between candidates, `exclude_px` is how far a candidate has to be from every target to count as a no, and `merge_px` is the radius within which passing points count as one object:
-
-```text
-g4   "checks": {"candidates": 16, "nms_px": 40, "exclude_px": 45, "jitter_px": 10}
-g4b  "checks": {"candidates": 16, "nms_px": 60, "exclude_px": 75, "jitter_px": 0,
-                "proposal": "peaks", "merge_px": 75}
-```
-
-A candidate within the 30 px click radius is a yes, one more than 75 px from every target is a no, and the band in between is left out of training (excerpt from `proposed_candidates`):
-
-```python
-for _, index in pick_peaks(scores, rows, columns, coordinate, spec["candidates"], spec["nms_px"]):
-    point = refine_peak(probs, index, rows, columns)
-    distance = nearest(point)
-    if distance <= CLICK_RADIUS or distance > spec["exclude_px"]:
-        points.append(point)
-        labels.append(int(distance <= CLICK_RADIUS))
-```
-
-At decision time, passing points within the merge radius count as one object (excerpt from `check_decision`, grading lines removed):
-
-```python
-order = sorted(range(len(points)), key=lambda index: (-p_yes[index], index))
-kept = []
-for index in order:
-    if all(_grid_px(points[index], points[other], coordinate) > merge_px for other in kept):
-        kept.append(index)
-chosen = [index for index in kept if p_yes[index] >= threshold]
-```
-
-The model still says yes to rims. At epoch 7, 676 of g4b's 765 wrong yeses are within 60 px of a target. The merge turns them into one click, though, and canvas pages with too many clicks fell from 114 (g4, epoch 2) to 5 (g4b, epoch 7).
-
-g4b's written plan, trained alongside, reached 0.846 (336 of 397) at epoch 7. That's one page above g2, which is a tie.
-
-### g4c: a count question
-
-On g4b's canvas pages, a common miss was the wrong number of targets. g4c adds one more branch, `How many:`, answered by one digit and trained against the number of clicks. At decision time it clicks the N likeliest merged candidates.
-
-After epoch 4 of 8, the count is right on 176 of 180 canvas pages (98%) but only 56 of 62 grids (90%). It helps canvas a little (148 of 180, against 144 with the plain 0.5 threshold) and hurts grids (56 against 60). Its written plan is at 0.839 (333 of 397), level with the others.
-
-## Findings
-
-### Grids: the checks win
+A shortcut would have put wrong yeses anywhere on the page. Almost all of these were 30 to 60 px from a target, on the edge of the same object. With candidates 40 px apart, one object gave two or three yeses and each became its own click. The model was right about the object, and the readout counted it more than once. Merging yeses within 75 px into one click lifted canvas from 52 to about 97 of 180 with no retraining. g4b built that into training and decoding, and pages with too many clicks fell from 114 to 5. g4c added the "How many:" question on top.
 
 ![Checks against the written plan on grids and canvas, and how often the checks pass the plan's points](fig5-checks-vs-written.png "Figure 11. (a, b) Checks against the written plan on the same held-out first steps. Grids: the checks match or beat the plan at every epoch, and g4c reaches 60 of 62. Canvas: the checks peak at 151 of 180 (g4b, epoch 4) while the plan holds 155 to 158 from epoch 4. (c) On g4b's epoch-7 checkpoint, the checks pass 398 of 399 of the plan's correct canvas points and 14 of its 19 wrong ones.")
 
-On picture grids the checks are level with or above the written plan at every epoch, at 58 of 62 from epoch 4 on and 60 of 62 in g4c. A grid is the easiest case for them, with nine fixed candidates, nothing to point at, and one yes/no each.
-
-### Canvas: the checks never caught up
-
-On canvas the checks never caught the written plan: 151 against 157 at g4b's epoch 4, and 149 against 158 at epoch 7. I tried every combination I could think of offline, and on canvas alone none beat the written plan. Over all 242 click and grid pages, the best one ("written plan minus the points the checks reject") gained two or three pages, most of them on grids.
-
-A direct test settled it. On g4b's epoch-7 checkpoint I used the written plan's own points as the candidates. The checks passed 398 of its 399 correct points and 14 of its 19 wrong ones. Scored as pages, checks over the written points gave 156, checks over written points plus peaks 156, peaks alone 149, and the written plan 158.
-
-So the yes/no readout and the written plan share the same beliefs, and when the plan is wrong the checks usually agree with it. The canvas errors that remain come from what the model sees. The rest of the gap is candidates: from epoch 4 on, 5 to 13 canvas pages per epoch had a target that no candidate landed on.
-
-### Drags: early numbers
-
-![Grab and landing error distributions for drag where-questions](fig6-drag-errors.png "Figure 12. Drag \"where\" questions on 110 held-out single-drag pages (g4f, epochs 1 and 2). (a) Grab error: 87 of 110 within the 30 px grab radius at epoch 1, 76 at epoch 2. (b) Landing error: 44 of 110 within 20 px at both epochs.")
-
-A drop spot, like a faint hole, is hard to list as candidates in advance, so for drags g4f asks two pointer questions, `Piece:` and `Drop:`. Each is a short branch whose last token becomes the pointer head's query over every image patch (from the trainer, trimmed):
-
-```python
-WHERE_QUESTIONS = ("Piece:", "Drop:")
-
-
-def _where_scores(policy, prefix, encoded, train):
-    tokenizer = policy.processor.tokenizer
-    sequences = [tokenizer(question, add_special_tokens=False)["input_ids"] for question in WHERE_QUESTIONS]
-    states = policy.branch_states(prefix, sequences, policy.pointer_spec["layer"], train=train)
-    positions, rows, columns = coordinate_image_tokens(encoded["ids"], _encoded_grid(encoded),
-                                                       policy.pointer_image_token, policy.pointer_merge)
-    keys = prefix["captured"][0].index_select(0, policy.torch.tensor(positions, device=prefix["captured"].device))
-    return [pointer_scores(policy.pointer_head, states[row, len(sequence) - 1], keys)
-            for row, sequence in enumerate(sequences)], rows, columns
-```
-
-Numbers from its first two epochs:
-
-|  | Epoch 1 | Epoch 2 |
-| --- | --- | --- |
-| Where questions right | 43 / 110 | 39 / 110 |
-| Written plan right, same pages | 45 / 110 | 54 / 110 |
-| Either right | 64 / 110 | 61 / 110 |
-| Grab within 30 px | 87 / 110 (79%) | 76 / 110 (69%) |
-| Landing within 20 px | 44 / 110 (40%) | 44 / 110 (40%) |
-| Median grab / landing error | 16 / 29 px | 22 / 24 px |
-
-The model usually finds the right piece and then misses where it goes. The 20 px landing tolerance is smaller than one image patch, which covers about 25 px of the panel. The two readouts fail on different pages, so combining them should help.
-
-On these drag pages, g4f's own written plan (45, then 54) trailed g4b's at the same epochs (67, then 68). The where loss might be interfering with written drags, or it might be early-epoch noise like g4b's slow start, and two epochs aren't enough to tell.
-
-g4e adds a blurred copy of the panel as a second image, aimed at the faint letters. I only have its first epoch (0.662 written, 59 of 62 grid checks), which is too early to say anything.
+After those fixes the checks matched or beat the written plan on grids at every epoch, reaching 60 of 62 in g4c, and came close on canvas without catching it: 151 against 157 at g4b's epoch 4. To see why, I gave the checks the written plan's own points as candidates. They passed 398 of its 399 correct points and 14 of its 19 wrong ones. The readout and the plan share the same beliefs, so when the plan is wrong the checks usually agree with it, and the canvas errors that remain come from what the model sees. Reading the answer out instead of writing it costs a few canvas pages and nothing on grids.
 
 ## References
 
