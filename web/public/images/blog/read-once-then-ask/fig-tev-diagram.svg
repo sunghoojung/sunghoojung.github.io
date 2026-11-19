@@ -1,0 +1,109 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1500 680" width="1500" height="680" font-family="Arial, Helvetica, sans-serif" role="img" aria-label="How TEV answers: the model reads the screenshot and question once and keeps that reading. Short questions branch off it. Action and How many are answered by next-word probabilities. Top-left, Piece and Drop are answered by a pointer head that scores every image patch against the question with a query-key dot product, giving a heat map whose peak is the point. The 16 strongest peaks become candidate spots, each checked with a yes or no. A planner turns the answers into actions.">
+  <defs>
+    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#222"/></marker>
+    <marker id="ahb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#0F4D92"/></marker>
+  </defs>
+  <rect x="0" y="0" width="1500" height="680" fill="#ffffff"/>
+
+  <!-- read once -->
+  <rect x="20" y="280" width="170" height="96" rx="10" fill="#fff" stroke="#222" stroke-width="2"/>
+  <text x="105" y="320" font-size="17" text-anchor="middle" fill="#111">Screenshot</text>
+  <text x="105" y="344" font-size="17" text-anchor="middle" fill="#111">+ question</text>
+  <line x1="190" y1="328" x2="232" y2="328" stroke="#222" stroke-width="2" marker-end="url(#ah)"/>
+  <rect x="236" y="262" width="186" height="132" rx="10" fill="#E8F0FA" stroke="#0F4D92" stroke-width="2.5"/>
+  <text x="329" y="306" font-size="18" font-weight="bold" text-anchor="middle" fill="#0F4D92">Qwen3-VL-4B</text>
+  <text x="329" y="330" font-size="16" text-anchor="middle" fill="#111">+ LoRA</text>
+  <text x="329" y="360" font-size="14" text-anchor="middle" fill="#444">reads the page once</text>
+  <line x1="422" y1="328" x2="462" y2="328" stroke="#222" stroke-width="2" marker-end="url(#ah)"/>
+  <rect x="466" y="262" width="170" height="132" rx="10" fill="#F4F4F4" stroke="#222" stroke-width="2"/>
+  <text x="551" y="304" font-size="17" text-anchor="middle" fill="#111">Cached reading</text>
+  <text x="551" y="330" font-size="14" text-anchor="middle" fill="#444">keys and values for</text>
+  <text x="551" y="349" font-size="14" text-anchor="middle" fill="#444">every token, kept</text>
+  <text x="551" y="368" font-size="14" text-anchor="middle" fill="#444">for the questions</text>
+
+  <!-- branches -->
+  <path d="M636,328 C660,328 660,98 682,98" fill="none" stroke="#222" stroke-width="2" marker-end="url(#ah)"/>
+  <path d="M636,328 C660,328 660,228 682,228" fill="none" stroke="#222" stroke-width="2" marker-end="url(#ah)"/>
+  <path d="M636,328 C660,328 660,398 682,398" fill="none" stroke="#0F4D92" stroke-width="2.5" marker-end="url(#ahb)"/>
+  <path d="M636,328 C660,328 660,592 682,592" fill="none" stroke="#222" stroke-width="2" marker-end="url(#ah)"/>
+  <text x="560" y="250" font-size="13" text-anchor="middle" fill="#555">short questions branch off it</text>
+
+  <!-- row 1: action -->
+  <rect x="686" y="70" width="170" height="56" rx="8" fill="#fff" stroke="#222" stroke-width="2"/>
+  <text x="771" y="104" font-size="17" text-anchor="middle" font-family="Menlo, Consolas, monospace" fill="#111">Action:</text>
+  <line x1="856" y1="98" x2="896" y2="98" stroke="#222" stroke-width="2" marker-end="url(#ah)"/>
+  <rect x="900" y="70" width="250" height="56" rx="8" fill="#F4F4F4" stroke="#222" stroke-width="1.5"/>
+  <text x="1025" y="94" font-size="14" text-anchor="middle" fill="#111">next-word probabilities</text>
+  <text x="1025" y="114" font-size="14" text-anchor="middle" fill="#444">click · drag · box</text>
+  <line x1="1150" y1="98" x2="1190" y2="98" stroke="#222" stroke-width="2" marker-end="url(#ah)"/>
+  <rect x="1194" y="78" width="120" height="40" rx="20" fill="#E8F0FA" stroke="#0F4D92" stroke-width="1.5"/>
+  <text x="1254" y="104" font-size="15" text-anchor="middle" font-family="Menlo, Consolas, monospace" fill="#0F4D92">click 1.00</text>
+
+  <!-- row 2: count -->
+  <rect x="686" y="200" width="170" height="56" rx="8" fill="#fff" stroke="#222" stroke-width="2"/>
+  <text x="771" y="234" font-size="17" text-anchor="middle" font-family="Menlo, Consolas, monospace" fill="#111">How many:</text>
+  <line x1="856" y1="228" x2="896" y2="228" stroke="#222" stroke-width="2" marker-end="url(#ah)"/>
+  <rect x="900" y="200" width="250" height="56" rx="8" fill="#F4F4F4" stroke="#222" stroke-width="1.5"/>
+  <text x="1025" y="224" font-size="14" text-anchor="middle" fill="#111">next-word probabilities</text>
+  <text x="1025" y="244" font-size="14" text-anchor="middle" fill="#444">digits 0–9</text>
+  <line x1="1150" y1="228" x2="1190" y2="228" stroke="#222" stroke-width="2" marker-end="url(#ah)"/>
+  <rect x="1194" y="208" width="120" height="40" rx="20" fill="#E8F0FA" stroke="#0F4D92" stroke-width="1.5"/>
+  <text x="1254" y="234" font-size="15" text-anchor="middle" font-family="Menlo, Consolas, monospace" fill="#0F4D92">1</text>
+
+  <!-- row 3: pointer -->
+  <rect x="686" y="350" width="170" height="96" rx="8" fill="#fff" stroke="#0F4D92" stroke-width="2.5"/>
+  <text x="771" y="384" font-size="16" text-anchor="middle" font-family="Menlo, Consolas, monospace" fill="#111">Top-left:</text>
+  <text x="771" y="406" font-size="16" text-anchor="middle" font-family="Menlo, Consolas, monospace" fill="#111">Bottom-right:</text>
+  <text x="771" y="428" font-size="16" text-anchor="middle" font-family="Menlo, Consolas, monospace" fill="#111">Piece: Drop:</text>
+  <line x1="856" y1="398" x2="896" y2="398" stroke="#0F4D92" stroke-width="2.5" marker-end="url(#ahb)"/>
+  <rect x="900" y="316" width="250" height="164" rx="8" fill="#E8F0FA" stroke="#0F4D92" stroke-width="2.5"/>
+  <text x="1025" y="342" font-size="15" font-weight="bold" text-anchor="middle" fill="#0F4D92">Pointer head (layer 18)</text>
+  <text x="914" y="370" font-size="14" fill="#111"><tspan font-weight="bold">q</tspan> = Wq · the question's last token</text>
+  <text x="914" y="394" font-size="14" fill="#111"><tspan font-weight="bold">kᵢ</tspan> = Wk · image patch i  (440 of them)</text>
+  <text x="914" y="424" font-size="16" fill="#111" font-family="Menlo, Consolas, monospace">scoreᵢ = q·kᵢ / √256</text>
+  <text x="914" y="452" font-size="14" fill="#111">softmax over all patches</text>
+  <text x="914" y="470" font-size="13" fill="#444">like one attention head's Q·K</text>
+  <line x1="1150" y1="398" x2="1190" y2="398" stroke="#0F4D92" stroke-width="2.5" marker-end="url(#ahb)"/>
+  <!-- mini heat map, 8x6 patches -->
+  <g transform="translate(1194,343)">
+    <rect x="0" y="0" width="144" height="108" fill="#fff" stroke="#222" stroke-width="1.5"/>
+    <g stroke="#ffffff" stroke-width="1">
+      <rect x="0" y="0" width="18" height="18" fill="#f3f6fb"/><rect x="18" y="0" width="18" height="18" fill="#f3f6fb"/><rect x="36" y="0" width="18" height="18" fill="#eef3fa"/><rect x="54" y="0" width="18" height="18" fill="#e6eef8"/><rect x="72" y="0" width="18" height="18" fill="#dfe9f6"/><rect x="90" y="0" width="18" height="18" fill="#e6eef8"/><rect x="108" y="0" width="18" height="18" fill="#eef3fa"/><rect x="126" y="0" width="18" height="18" fill="#f3f6fb"/>
+      <rect x="0" y="18" width="18" height="18" fill="#f3f6fb"/><rect x="18" y="18" width="18" height="18" fill="#eef3fa"/><rect x="36" y="18" width="18" height="18" fill="#dfe9f6"/><rect x="54" y="18" width="18" height="18" fill="#b9cfeb"/><rect x="72" y="18" width="18" height="18" fill="#9cbbe2"/><rect x="90" y="18" width="18" height="18" fill="#b9cfeb"/><rect x="108" y="18" width="18" height="18" fill="#dfe9f6"/><rect x="126" y="18" width="18" height="18" fill="#eef3fa"/>
+      <rect x="0" y="36" width="18" height="18" fill="#eef3fa"/><rect x="18" y="36" width="18" height="18" fill="#e6eef8"/><rect x="36" y="36" width="18" height="18" fill="#b9cfeb"/><rect x="54" y="36" width="18" height="18" fill="#5b8bc9"/><rect x="72" y="36" width="18" height="18" fill="#0F4D92"/><rect x="90" y="36" width="18" height="18" fill="#5b8bc9"/><rect x="108" y="36" width="18" height="18" fill="#b9cfeb"/><rect x="126" y="36" width="18" height="18" fill="#e6eef8"/>
+      <rect x="0" y="54" width="18" height="18" fill="#f3f6fb"/><rect x="18" y="54" width="18" height="18" fill="#eef3fa"/><rect x="36" y="54" width="18" height="18" fill="#dfe9f6"/><rect x="54" y="54" width="18" height="18" fill="#9cbbe2"/><rect x="72" y="54" width="18" height="18" fill="#7aa3d6"/><rect x="90" y="54" width="18" height="18" fill="#9cbbe2"/><rect x="108" y="54" width="18" height="18" fill="#dfe9f6"/><rect x="126" y="54" width="18" height="18" fill="#eef3fa"/>
+      <rect x="0" y="72" width="18" height="18" fill="#f3f6fb"/><rect x="18" y="72" width="18" height="18" fill="#f3f6fb"/><rect x="36" y="72" width="18" height="18" fill="#eef3fa"/><rect x="54" y="72" width="18" height="18" fill="#dfe9f6"/><rect x="72" y="72" width="18" height="18" fill="#d3e1f2"/><rect x="90" y="72" width="18" height="18" fill="#dfe9f6"/><rect x="108" y="72" width="18" height="18" fill="#eef3fa"/><rect x="126" y="72" width="18" height="18" fill="#f3f6fb"/>
+      <rect x="0" y="90" width="18" height="18" fill="#f3f6fb"/><rect x="18" y="90" width="18" height="18" fill="#f3f6fb"/><rect x="36" y="90" width="18" height="18" fill="#f3f6fb"/><rect x="54" y="90" width="18" height="18" fill="#eef3fa"/><rect x="72" y="90" width="18" height="18" fill="#eef3fa"/><rect x="90" y="90" width="18" height="18" fill="#eef3fa"/><rect x="108" y="90" width="18" height="18" fill="#f3f6fb"/><rect x="126" y="90" width="18" height="18" fill="#f3f6fb"/>
+    </g>
+    <line x1="75" y1="45" x2="87" y2="45" stroke="#fff" stroke-width="2.5"/><line x1="81" y1="39" x2="81" y2="51" stroke="#fff" stroke-width="2.5"/>
+  </g>
+  <text x="1216" y="470" font-size="13" fill="#444">heat map over the</text>
+  <text x="1216" y="488" font-size="13" fill="#444">patches; peak = point</text>
+
+  <!-- peaks feed the checks -->
+  <path d="M1200,454 C1150,532 830,512 771,560" fill="none" stroke="#0F4D92" stroke-width="2" stroke-dasharray="6 5" marker-end="url(#ahb)"/>
+  <text x="1010" y="552" font-size="13" text-anchor="middle" fill="#0F4D92">its 16 strongest peaks become the candidate spots</text>
+
+  <!-- row 4: checks -->
+  <rect x="686" y="564" width="170" height="56" rx="8" fill="#fff" stroke="#222" stroke-width="2"/>
+  <text x="771" y="590" font-size="16" text-anchor="middle" font-family="Menlo, Consolas, monospace" fill="#111">Check [x,y] -&gt;</text>
+  <text x="771" y="610" font-size="13" text-anchor="middle" fill="#444">once per candidate</text>
+  <line x1="856" y1="592" x2="896" y2="592" stroke="#222" stroke-width="2" marker-end="url(#ah)"/>
+  <rect x="900" y="564" width="250" height="56" rx="8" fill="#F4F4F4" stroke="#222" stroke-width="1.5"/>
+  <text x="1025" y="588" font-size="14" text-anchor="middle" fill="#111">next-word probabilities</text>
+  <text x="1025" y="608" font-size="14" text-anchor="middle" fill="#444">yes · no</text>
+  <line x1="1150" y1="592" x2="1190" y2="592" stroke="#222" stroke-width="2" marker-end="url(#ah)"/>
+  <rect x="1194" y="572" width="120" height="40" rx="20" fill="#E8F0FA" stroke="#0F4D92" stroke-width="1.5"/>
+  <text x="1254" y="598" font-size="15" text-anchor="middle" font-family="Menlo, Consolas, monospace" fill="#0F4D92">yes .99</text>
+
+  <!-- planner -->
+  <path d="M1314,98 C1350,98 1350,330 1370,330" fill="none" stroke="#222" stroke-width="2"/>
+  <path d="M1314,228 C1345,228 1345,330 1370,330" fill="none" stroke="#222" stroke-width="2"/>
+  <path d="M1338,398 C1352,398 1352,340 1370,340" fill="none" stroke="#222" stroke-width="2"/>
+  <path d="M1314,592 C1350,592 1350,350 1370,350" fill="none" stroke="#222" stroke-width="2"/>
+  <rect x="1372" y="290" width="112" height="100" rx="10" fill="#fff" stroke="#222" stroke-width="2"/>
+  <text x="1428" y="332" font-size="17" text-anchor="middle" fill="#111">Planner</text>
+  <text x="1428" y="356" font-size="14" text-anchor="middle" fill="#444">→ actions</text>
+  <text x="1428" y="420" font-size="13" text-anchor="middle" fill="#444">no text</text>
+  <text x="1428" y="438" font-size="13" text-anchor="middle" fill="#444">generated</text>
+</svg>
