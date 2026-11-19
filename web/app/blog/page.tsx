@@ -13,6 +13,18 @@ export default function BlogPage() {
   return (
     <SiteShell current="/blog">
       <h1>Blog</h1>
+      {/* `npm run dev` only; handled by editor/server.ts. */}
+      {import.meta.env.DEV && (
+        <form className="new-post" method="post" action="/__post-editor/new">
+          <input
+            name="title"
+            required
+            placeholder="Title of a new post"
+            aria-label="Title of a new post"
+          />
+          <button type="submit">New post</button>
+        </form>
+      )}
       {posts.length === 0 ? (
         <p className="meta">No posts yet.</p>
       ) : (
@@ -26,6 +38,11 @@ export default function BlogPage() {
                 <h2 className="post-list-title">
                   <a href={`/blog/${post.slug}`}>{post.title}</a>
                   {post.draft && <span className="draft-tag">Draft</span>}
+                  {import.meta.env.DEV && (
+                    <a className="draft-tag" href={`/blog/${post.slug}?edit`}>
+                      Edit
+                    </a>
+                  )}
                 </h2>
                 {post.description && <p className="meta">{post.description}</p>}
                 {post.thumbnail && (

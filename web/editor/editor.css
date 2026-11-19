@@ -1,0 +1,343 @@
+/* `npm run dev` only: the post editor (editor/client.ts). Colors come from
+   the site's own tokens in app/globals.css, so it follows light and dark. */
+
+:root {
+  --pe-warn: #b3261e;
+  --pe-shadow: 0 4px 16px rgb(0 0 0 / 0.12);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --pe-warn: #ff8a80;
+    --pe-shadow: 0 4px 16px rgb(0 0 0 / 0.5);
+  }
+}
+
+[class^="pe-"][hidden] {
+  display: none !important;
+}
+
+.pe-edit {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 30;
+  padding: 8px 18px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--background);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  box-shadow: var(--pe-shadow);
+  cursor: pointer;
+}
+
+.pe-edit:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Toolbar */
+
+.pe-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  margin: -40px 0 32px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--rule);
+  background: var(--background);
+  font-size: 14px;
+}
+
+.pe-toolbar button {
+  min-width: 32px;
+  height: 32px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.pe-toolbar button:hover {
+  background: var(--surface);
+}
+
+.pe-toolbar button.pe-on {
+  background: var(--surface);
+  color: var(--accent);
+}
+
+.pe-toolbar button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.pe-toolbar .pe-bold {
+  font-weight: 700;
+}
+
+.pe-toolbar .pe-italic {
+  font-style: italic;
+  font-family: Georgia, serif;
+}
+
+.pe-toolbar .pe-bullet {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.pe-toolbar .pe-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+}
+
+.pe-sep {
+  width: 1px;
+  height: 20px;
+  margin: 0 6px;
+  background: var(--rule);
+}
+
+.pe-end {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.pe-status {
+  padding: 0 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.pe-status[data-state="error"],
+.pe-status[data-state="conflict"] {
+  color: var(--pe-warn);
+}
+
+.pe-toolbar button.pe-done {
+  padding: 0 14px;
+  background: var(--accent);
+  color: var(--background);
+}
+
+.pe-toolbar button.pe-done:hover {
+  background: var(--accent);
+  opacity: 0.88;
+}
+
+/* Post settings, shown in place of the date line */
+
+.pe-settings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  margin-bottom: 32px;
+  padding: 14px 16px;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.pe-settings label {
+  display: grid;
+  gap: 4px;
+}
+
+.pe-settings .pe-wide {
+  flex-basis: 100%;
+}
+
+.pe-settings .pe-check {
+  display: flex;
+  align-items: center;
+  align-self: end;
+  gap: 6px;
+  padding-bottom: 6px;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.pe-settings input:not([type="checkbox"]),
+.pe-settings textarea {
+  padding: 6px 8px;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: var(--background);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+}
+
+.pe-settings textarea {
+  resize: vertical;
+}
+
+/* The page being edited */
+
+.pe-article h1,
+.pe-article .post-body {
+  outline: none;
+  caret-color: var(--accent);
+}
+
+.pe-article .post-body {
+  min-height: 40vh;
+}
+
+.pe-article .post-body a {
+  cursor: text;
+}
+
+.pe-island,
+.pe-figure {
+  border-radius: 8px;
+  outline: 1px dashed transparent;
+  outline-offset: 6px;
+}
+
+.pe-island {
+  cursor: pointer;
+}
+
+.pe-island:hover,
+.pe-figure:hover {
+  outline-color: var(--muted);
+}
+
+.pe-raw pre {
+  color: var(--muted);
+}
+
+.pe-figure figcaption {
+  outline: none;
+  cursor: text;
+}
+
+.pe-figure figcaption:empty::before {
+  content: attr(data-placeholder);
+  opacity: 0.6;
+}
+
+/* A block open as Markdown */
+
+.pe-source {
+  margin: 16px 0;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.pe-source textarea,
+.pe-markdown {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: var(--surface);
+  color: var(--text);
+  font:
+    13.5px/1.55 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Consolas,
+    monospace;
+  tab-size: 4;
+  outline: none;
+}
+
+.pe-source textarea {
+  min-height: 72px;
+  padding: 12px 14px;
+  resize: none;
+  overflow: hidden;
+}
+
+.pe-source-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 6px 4px 14px;
+  border-top: 1px solid var(--rule);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.pe-markdown {
+  min-height: 75vh;
+  padding: 16px 18px;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  resize: vertical;
+}
+
+/* Floating controls */
+
+.pe-chrome,
+.pe-popover {
+  position: absolute;
+  z-index: 25;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  background: var(--background);
+  box-shadow: var(--pe-shadow);
+  font-size: 13px;
+}
+
+.pe-chrome button,
+.pe-popover button,
+.pe-source-bar button {
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.pe-chrome button:hover,
+.pe-popover button:hover,
+.pe-source-bar button:hover {
+  background: var(--surface);
+}
+
+.pe-popover {
+  padding: 6px;
+}
+
+.pe-popover input {
+  width: min(320px, 60vw);
+  padding: 5px 8px;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: var(--background);
+  color: var(--text);
+  font: inherit;
+}
+
+@media (max-width: 720px) {
+  .pe-toolbar {
+    margin-top: -24px;
+  }
+
+  .pe-edit {
+    right: 16px;
+    bottom: 16px;
+  }
+}

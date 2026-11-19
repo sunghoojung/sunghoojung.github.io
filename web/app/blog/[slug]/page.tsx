@@ -39,6 +39,10 @@ export default async function PostPage({ params }: Props) {
           dangerouslySetInnerHTML={{ __html: post.html }}
         />
       </article>
+      {/* `npm run dev` only: the in-page editor. Builds leave it out. */}
+      {import.meta.env.DEV && (
+        <script async type="module" src="/editor/client.ts" />
+      )}
     </SiteShell>
   );
 }

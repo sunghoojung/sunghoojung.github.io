@@ -1,6 +1,6 @@
 import vinext from "vinext";
 import { defineConfig } from "vite";
-import { blogReload } from "./build/blog-reload";
+import { postEditor } from "./editor/server";
 
 const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";
 
@@ -21,8 +21,9 @@ export default defineConfig(async () => {
         : {}),
     },
     plugins: [
+      // First, so its requests are answered before the app's routes.
+      postEditor(),
       vinext(),
-      blogReload(),
       cloudflare({
         viteEnvironment: { name: "rsc", childEnvironments: ["ssr"] },
         config: {

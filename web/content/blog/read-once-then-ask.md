@@ -1,9 +1,8 @@
 ---
-title: "Read once, then ask: yes/no readouts for a small vision-language model"
-date: 2026-11-17
+title: Training a system one model to solve captchas
+date: 2026-11-19
 draft: true
-thumbnail: fig1-format-plateau.png
-description: "An experiment log from fine-tuning Qwen3-VL-4B on image puzzles from human demonstrations: what plateaued, what moved the held-out score, and what happened when the written plan was replaced by Jev-style yes/no questions read from the model's hidden states."
+thumbnail: pasted-20261119182822.png
 tags:
   - machine-learning
   - vision-language-models
@@ -12,201 +11,171 @@ tags:
   - experiment-log
 ---
 
-> Draft, 17 November 2026. Three runs are still training (g4c, g4e, g4f). Their numbers below are partial and marked as such.
-
-I fine-tuned a 4-billion-parameter vision-language model to solve image puzzles from human demonstrations. For a week the held-out score would not move. Then three things moved it: more data, a loss aimed at the decision, and a pointing loss for the vision tower. After that it stopped again, at about 0.84.
-
-The last part of this post is about a different way to read the answer out. Instead of having the model write a plan and parsing it, I ask it short yes/no questions on top of one shared reading of the page and read the answer from its own token probabilities. The idea comes from TypeSafe's Jev decision model and its open re-implementation, Kev.
-
-It works on picture grids. On free-form canvases it does not beat the written plan, and a direct test says why: the yes/no answers share the written plan's beliefs, so the remaining errors are about what the model sees, not how its answer is read.
-
-## TL;DR
-
-- Task. Qwen3-VL-4B with LoRA, trained on 1,082 pages of recorded human demonstrations. Scored on 397 held-out pages by one strict number: is the whole plan on the page's first step right?
-- What plateaued. Five written-reasoning formats, GRPO, vision LoRA at a low rate, 4× more image tokens and an 8B model. The three best formats all peaked at exactly 65 of 151 new-family pages.
-- What moved. More data (+18 to +22 pages on the same 310 held-out pages), then putting the loss on the decision tokens (0.844), then a pointing loss (0.839, a tie that arrived three epochs sooner).
-- Jev-style checks. One `Check [x,y] ->` branch per candidate point, answered by the model's own `" yes"` / `" no"` probabilities. Grids: 58-60 of 62, level with or above the written plan. Canvas clicks: 151 of 180 at best, against 157-158 for the written plan.
-- The instructive failure. The first version collapsed on canvas (95 to 52 of 180) because several candidates landed on one object. 898 of 988 wrong yeses sat within 60 px of a real target. My first diagnosis was wrong, and the data said so.
-- The finding. On the best checkpoint, the checks pass 398 of 399 of the written plan's correct points and 14 of its 19 wrong ones. They inherit its mistakes.
-- In progress. Drag "where" questions: the grab is within 30 px on 79% of pages, the landing within 20 px on only 40%.
-
 ## Contents
 
-<!-- contents -->
+1. [Exploring CAPTCHA Challenges: A Deep Learning Approach](#exploring-captcha-challenges-a-deep-learning-approach)
+2. [Setup](#setup)
+3. [What plateaued](#what-plateaued)
+4. [What moved the needle](#what-moved-the-needle)
+5. [The Jev idea](#the-jev-idea)
+6. [Jev versions, and how the first one failed](#jev-versions-and-how-the-first-one-failed)
+7. [Findings](#findings)
+8. [Lessons](#lessons)
+9. [What is next](#what-is-next)
+10. [Mistakes worth admitting](#mistakes-worth-admitting)
+11. [References](#references)
 
-## Why this problem
+## Exploring CAPTCHA Challenges: A Deep Learning Approach
 
-The puzzles are small images with a one-line instruction. There are four kinds:
+Having a background in sneaker Twitter and botting, I've always found CAPTCHAs intriguing. These challenges serve to thwart bots and protect websites, particularly in my sphere, where they complicate quick purchases for very popular items. Historically, methods for solving CAPTCHAs relied heavily on convolutional neural networks (CNNs) that were trained on extensive datasets of images. However, I observed that as CAPTCHA formats evolved, these CNNs often struggled to generalize, becoming ineffective in solving novel challenges without extensive retraining on new datasets. This realization dates back to 2019, and I'm excited to return to this problem with fresh knowledge and a clearer understanding of CNN limitations.
 
-- Picture grids. A 3×3 grid of photos: "Pick all objects that melt at room temperature."
-- Canvas clicks. A 500×550 scene with many small objects: "Find drinks that can be hot or cold."
-- Drags. Move a piece to where it fits: "Drag the letter to the place where it fits."
-- Boxes. "Please draw a box around the object that is different."
+I chose to focus on hCaptcha for my experiments, as it regularly introduces new challenges that require reasoning and adaptability. While CAPTCHAs track various user behaviors, like mouse movements and IP addresses, data about your specific browser, my primary focus for this deep learning final project is tackling the difficulty of solving these challenges.\
+hCaptcha serves out these puzzles with a small images with a one-line instruction. There are four kinds:
 
-They are a good testbed for vision-language models for three reasons. Every answer is checkable, so there is no judging. The instructions mix perception ("the faint letter") with world knowledge ("melts at room temperature"). And a page often needs several actions, so the model has to commit to a plan.
+- **Picture grids.** A 3×3 grid of photos: "Pick all objects that melt at room temperature."
+- **Canvas clicks.** A 500×550 scene with many small objects: "Find drinks that can be hot or cold."
+- **Drags.** Move a piece to where it fits: "Drag the letter to the place where it fits."
+- **Boxes.** "Please draw a box around the object that is different."
 
-The data is human demonstrations: someone solves the page and every click, drag and box is recorded. The model learns to imitate them. No labelling beyond that.
+If you've encountered hCaptcha, you recognize the challenge of solving certain tasks as they continuously roll out new types of puzzles. My aim is to train a model that can effectively generalize to these new challenges with minimal data.
 
-The question I kept coming back to is simple. When a small model gets a page wrong, is it because it cannot see the answer, or because it sees it and fails to say it?
+![Example of a drag challenge](pasted-20261119182822.png)
 
-## Setup and scoreboard
+## Setup
 
-Model. Qwen3-VL-4B-Instruct in bf16. LoRA rank 16, α 32, on the seven language projections (33M parameters). Later runs also put LoRA on the 24 vision blocks and the merger (7.2M more).
+**Terms.** A page is one screen of a challenge, and each action on it is a step. A family is a question type, such as "drinks that can be hot or cold". Held-out pages are never trained on. A new-family page is a type with no training examples at all; a seen-family page is a new puzzle of a type the model trained on.
 
-Hardware. Almost everything ran on one 16 GB RTX 4060 Ti. One epoch takes 60-75 minutes and an 8-epoch run about 12-13 hours. On the last day I added a rented 2× RTX 5080, about 2.3× faster per step, to run two experiments at once.
+**Model.** Qwen3-VL-4B-Instruct in bf16, trained with LoRA adapters. I chose it because it fits my dataset and a single 16 GB GPU, and because a small model makes ablations cheap: I can find out what works here before spending time and money on a bigger one.
 
-Data. 1,096 recorded episodes gave 4,246 usable steps from 1,048 challenges. The final split has 1,082 training pages, 397 held-out pages, and 18 pages from two question families held out completely.
+**Data.** I built a recorder that logged every click, drag and box a person made, frame-aligned to what was on screen. Each solved challenge became one "episode." I started with about a thousand and ended with 1,368.
 
-Output. On each step the model writes three short lines and an action:
+**Output.** For most of the project the model wrote three short lines and then its action:
 
-```text
+```
 Selected: [...]     what is already done
 Remaining: [...]    every action still to take, in panel pixels
 Target: {...}       the next action
 ```
 
-Metric. First-step plan right: on a page's first step, the `Remaining` list must match the human's actions exactly, in any order. A click counts within 30 px. A grid click counts on the right tile. A drag counts when the grab is within 30 px and the piece lands within 20 px of where the human's landed. A box counts by overlap. Every number in this post is pages right out of pages scored.
+The training targets for these lines come straight from the human's recorded actions, so they are right by construction. The first RL runs used free-form reasoning instead, and by the end the model writes nothing at all (see "Read it out").
 
-Noise. This took me too long to take seriously.
+**Metrics.**
 
-- vLLM's bf16 numerics change with batching. Re-running the same weights greedily changed 98 of 225 answers by a coordinate digit, which is about ±2 points of noise from arithmetic alone.
-- A paired bootstrap over challenges put run-to-run differences at about ±6-8 points on the 151-397-page splits.
-- Neighbouring epochs of one run move by up to 9 pages, even in the stable runs.
+- _Step accuracy_ (the RL section only): is this one next action a valid move depending on the current state.
+- _First-step plan right_ (everything after): on a page's first step, the Remaining list must match the human's actions exactly, in any order. A click counts within 30 px. A grid click counts on the right tile. A drag counts when the grab is within 30 px and the piece lands within 20 px of where the human's landed. A box counts when it overlaps the human's box by at least half (IoU ≥ 0.5).
 
-So a one-page gap on 397 is a tie, and I report it as one.
+![One recorded episode: "Find drinks that can be hot or cold". The person clicked the coffee cup, the mug and the glass, then submitted.](episode-example.png)
 
-How this was run: AI coding agents wrote much of the code and watched the runs. One format's rule sentences were written by LLM subagents and checked by blind LLM raters. A separate agent, given read-only access and no conclusions, did the review in the next section.
+The recorder saved each click with the screenshot it was made on: (130, 220), (220, 217) and (393, 375) in panel pixels, then a submit. That one page becomes four training examples, one per step. In each, the model sees that step's screenshot, the question and the actions so far, and learns to write:
+
+```text
+[step 1]
+Selected: []
+Remaining: [{"op":"click","at":[260,400]},{"op":"click","at":[440,395]},{"op":"click","at":[786,682]}]
+Target: {"op":"click","at":[260,400]}
+<answer>{"op":"click","at":[260,400]}</answer>
+
+[step 2]
+Selected: [{"op":"click","at":[260,400]}]
+Remaining: [{"op":"click","at":[476,398]},{"op":"click","at":[822,669]}]
+Target: {"op":"click","at":[476,398]}
+
+[step 3]
+Selected: [{"op":"click","at":[260,400]},{"op":"click","at":[440,395]}]
+Remaining: [{"op":"click","at":[822,669]}]
+Target: {"op":"click","at":[822,669]}
+
+[step 4]
+Selected: [{"op":"click","at":[260,400]},{"op":"click","at":[440,395]},{"op":"click","at":[786,682]}]
+Remaining: []
+Target: {"op":"submit"}
+```
+
+Coordinates are on a 0–1000 grid over the panel. Step 1 is the one the metric scores: its Remaining list is the whole plan for the page. From step 2 on, the plan is carried in the prompt with each point restated a few pixels off the person's click (up to 25 px), so the model has to recognize what is already done by where it is, not by copying numbers from the history.
+
+**Noise.** vLLM's bf16 arithmetic changes with batching. Re-running the same weights greedily changed 98 of 225 answers by a coordinate digit, about ±2 points of noise from arithmetic alone.
+\- A paired bootstrap over challenges put run-to-run differences at about ±6–8 points on the 151- and 207-page splits.
+\- Neighbouring epochs of one run move by up to 9 pages, even in the stable runs.
 
 ## What plateaued
 
 ### GRPO first
 
-I started with reinforcement learning, following DeepSeek-R1-Zero: groups of 16 samples, group-normalised advantages, a clipped ratio and a KL penalty. Six runs taught me a lot about RL hygiene and little about the task.
+I started with reinforcement learning because of DeepSeek-R1-Zero, which applied GRPO straight to a base model and watched reasoning emerge on its own (AIME 2024 went from 15.6% to 71%). I underestimated the cost and the chaos. On one 16 GB GPU a single schedule took about 96 hours, and runs broke in strange ways: reasoning decayed into word salad, answers looped one sentence, weights turned into NaN, and Chinese words crept into English answers, the same "language mixing" the R1 paper reports.
 
-- Run 3 reached 0.712 action accuracy, then its weights went NaN at update 1,728 when the KL estimator overflowed. The only watchdog had exited long before, so eight rollouts trained on NaN.
-- Run 5 added a supervised warm start on 474 written steps. The warm start alone, 40 minutes of training, gave 0.706. GRPO added about 0.04 and then drifted until its guard stopped it.
-- A supervised-only sweep later matched it, 0.745, with no RL at all.
+The deeper problem was the starting point. GRPO compares several answers to the same question and pushes toward the better ones, so it can only reinforce what a model already does some of the time. R1-Zero started from a huge model that already knew math. Mine knew almost nothing about these puzzles: on drags, all 16 tries failed together in every early group, leaving nothing to learn from. In run 5, 40 minutes of plain supervised training on 474 steps took step accuracy from 0.31 to 0.71. GRPO then added only 0.04 before drifting, and a later supervised-only run matched it with no RL at all. GRPO from my best supervised model hit the same wall from the other side: its whole-plan score was 0.849 before and after 48 updates, because the model now passed most rows in all 16 tries.
 
-Much later I ran GRPO again from the best supervised model. Held-out score was 0.849 at update 0 and 0.849 at update 48. Only 16-39% of groups had any spread in reward, because the model already got most training rows right in all 16 samples. GRPO is parked for later, when new failures can supply the signal.
+Looking back, this is the order the field uses. Even DeepSeek's released R1 was fine-tuned on curated examples before RL, partly to fix R1-Zero's language mixing. RL is worth it once a model succeeds often enough to learn from, but not reliably. Before that, more demonstrations do more than any reward.
 
-### Five reasoning formats, one ceiling
+![Run 5 and the GRPO learning signal](fig-grpo.png "Figure 1. (a) Run 5 on held-out new question families: 40 minutes of supervised training takes the untrained model from 0.31 to 0.71; GRPO peaks at 0.745, level with a supervised-only run, then drifts until its guard stops it. (b) Share of GRPO groups whose 16 tries got different rewards, the only groups GRPO can learn from. It shrinks as the model improves, and starting from the best supervised model it stays at 11–39%.")
 
-![Five reasoning formats on the old split, all reaching 65 of 151 new-family pages](fig1-format-plateau.png)
+**Five reasoning formats, one ceiling**
 
-Figure 1. Five written-reasoning formats on the old split. (a) New question families, 151 pages. (b) Seen families, 207 pages. v5 at epoch 4, v8 at epoch 3 and v9 at epoch 2 each got exactly 65 of 151 new-family pages right.
+With RL set aside, I went back to supervised training and asked a simpler question: does it matter what the model writes before its plan? From here on, every number is the stricter score, the whole plan right on a page's first step. I tried five formats:
 
-I tried five ways of writing the reasoning before the plan:
+| Format | What the first step writes | Best new / seen |
+| --- | --- | --- |
+| v5 | a scene sentence, then the plan | 0.44 / 0.69 |
+| v6b | an object list and a rule, plus two other changes | 0.40 / 0.68 |
+| v7 | `[x,y] name -> yes/no` for every object | 0.36 / 0.68 |
+| v8 | all objects, then a rule sentence, then verdicts | 0.43 / 0.69 |
+| v9 | v8 with one `[x,y] -> verdict` line per object | 0.43 / 0.62 |
 
-| Format | What the first step writes                        | Best new / seen |
-| ------ | ------------------------------------------------- | --------------- |
-| v5     | a scene sentence, then the plan                   | 0.43 / 0.69     |
-| v6b    | an object list and a rule, plus two other changes | 0.40 / 0.68     |
-| v7     | `[x,y] name -> yes/no` for every object           | 0.36 / 0.68     |
-| v8     | all objects, then a rule sentence, then verdicts  | 0.43 / 0.69     |
-| v9     | v8 with one `[x,y] -> verdict` line per object    | 0.43 / 0.62     |
+![Five reasoning formats on the old split, peaking at 65 to 67 of 151 new-family pages](fig1-format-plateau.png "Figure 2. Five written-reasoning formats on the old split, whole first-step plan right per epoch. (a) New question families, 151 pages. (b) Seen families, 207 pages. The best formats peak at 65 to 67 of 151 new-family pages, a tie within noise.")
 
-The formats changed which pages were right, not how many. Of the 86 new-family misses, 51 were letter drags and hexagon shapes, two families with zero training pages. No format can fix that.
+The formats changed which pages were right, not how many. The misses explain why. Of v8's 86 misses on new families, 51 were letter drags and hexagon shapes, two families with zero training pages. No way of writing can teach a puzzle the model has never seen. From here I decided I needed to gather more data for these underseen challenges.
 
-A token count explained part of it. In one v8 epoch there were 304,523 supervised tokens. 42% described the scene, 46% were copied bookkeeping that reached near-zero loss after one epoch, and only 12% were the decision. The gradient was mostly memorising object names and positions.
+A token count showed why more writing didn't help either. In one v8 epoch there were 304,523 supervised tokens: 42% described the scene, 46% were bookkeeping copied from earlier lines, which reached near-zero loss after one epoch, and only 12% were the decision itself. Most of the gradient went into memorising object names and positions, not into choosing.
+
+That left one question: was the model failing to *see* these puzzles, or seeing them and not using what it saw?
 
 ### The eyes see more than the words use
 
-I spent a day on the vision side. Four results:
+I spent a day focusing on the vision aspect, posing a single question: when the model gets a puzzle wrong, is it because it cannot see the answer, or because it sees it but fails to utilize it? I found four results along with a caveat.
 
-- Asking differently helps. Asked directly to point at the loose letter on new-family drag pages, the model finds it on 37 of 39. Inside its trained reasoning, it grabs it on 22 of 39. It often invents a scene and then acts on the invention.
-- The model's own vision tower is the best of 23 encoders. I compared patch features with fixed rules and no training: is the drop spot the patch most like the piece; are the odd objects the least like the rest. Qwen's tower at three-quarter depth averaged 0.51, ahead of DINOv2 giant at 0.44. At its last layer it scored 0.26.
-- Blur helps one family. A 5 px Gaussian blur removes a grid overlay that hides faint letters. On those letters the tower went from 0.00 to 0.44. It makes holes worse.
-- Size and resolution do not. Four times the image tokens and the 8B model left the hard questions flat.
+**Asking questions differently can lead to better outcomes.** I took the best model checkpoint from the format runs and posed straightforward questions outside of its trained format, such as, "Point to the loose letter." On new-family letter-drag pages, it correctly identified the letter in 37 out of 39 instances. However, when working within its trained reasoning on the same pages, it only identified the correct letter in 22 of 39 tries. Reviewing the 17 errors, I found that the model often generated a scene that was not present ("a purple Y on the left") and then acted on what it had imagined. While the image was accurate, the text deviated from it. Unfortunately, in the second half of the drag, where the letter fits, the model performed consistently poorly, achieving only 5 or 6 correct answers out of 39 regardless of how I phrased the question. This aspect may require a faint outline, which presents a different challenge.
 
-One caveat came from the review. Qwen3-VL already feeds three intermediate vision layers into the language model, so "the last layer loses it" is too simple. The claim that survives is narrower: the information is in the vision features, and the language readout does not use it.
+**The model's own vision tower ranks as the best among 22 encoders.** To assess how much a vision encoder already knows, I extracted patch features from 22 encoders at three different depths and evaluated them using fixed criteria without any training: the drop spot was identified as the patch most similar to the piece; the odd object was the one least similar to the rest; and a matching cluster was identified as the one most similar to the clicked cluster.
 
-### Fixing the scoreboard
+![Mean hit rate of 22 vision encoders on seven untrained matching rules](fig-encoders.png "Figure 3. Patch features from 22 vision encoders, scored with seven fixed matching rules and no training (best of raw and blurred per rule, best depth per encoder). Qwen's own tower at three-quarter depth leads at 0.51. Its last layer, the one nearest the language model, falls to 0.26.")
 
-The independent review was blunt. The scoreboard could not show a win. Noise was about ±7 points, and a third of the new-family pages came from families with no training data. There was no evaluation on training pages, so underfitting and memorising looked the same. Weight decay and LoRA dropout were hard-coded to zero. And the earlier vision-LoRA run, at a learning rate of 2e-5, had moved the vision weights by only 0.37%. Training the eyes had never really been tested.
+Qwen's tower at a three-quarter depth averaged 0.51, outperforming the DINOv2 giant, which scored 0.44. Depth proved to be more significant than the choice of model; nearly every encoder performed best at around three-quarter depth, while Qwen's own last layer scored only 0.26. On the task of identifying "the tile that breaks the pattern," the score dropped from 0.62 at three-quarter depth to 0.04 at the last layer. Notably, a simple rule, such as plain cosine similarity without any training, successfully identified the odd object 93% of the time across various pages, whereas the full model, when asked in words, failed on many of those same pages.
 
-So I re-split by challenge, 75/25 within every family, kept a fixed 100-page training sample in every evaluation, and trained on plan-only completions with no written notes. Plan-only tied the written formats on shared pages (27 against 25-27 of 44) while being much shorter. From here every number is comparable.
+**Blurred images improved performance for one family of tasks.** Letter-drag panels are often obscured by stripes that hide the faint outline of the letters they contain. Applying a 5 px Gaussian blur eliminated these stripes.
+
+![A letter-drag page as served and after a 5 px Gaussian blur](fig-blur.png "Figure 4. A letter-drag page. (a) As served: the piece (blue) belongs on the faint D under the stripes (red, dashed). (b) After a 5 px Gaussian blur, the stripes are gone.")
+
+With the blurred faint letters, the tower's last layer score increased from 0.00 to 0.44, and the overall model's performance in identifying "where it fits" rose from 5 to 9 out of 39. However, blurring proved to be ineffective in other areas; it removed the edges of holes, leading to poorer performance on hole puzzles (from 14 correct answers to only 8 out of 22).
+
+**Increasing size and resolution didn't yield better results.** When the image tokens were quadrupled, the "where it fits" performance remained at just 3 out of 39, while an untrained 8B model achieved only 4. Overall scores for 1×, 2×, and 4× tokens were nearly indistinguishable, indicating that more pixels and a larger model were not the solution.
+
+One important caveat arose during the review in the next section. Qwen3-VL already incorporates three intermediate vision layers into the language model, not just the last one. Therefore, the claim that "the last layer loses it" oversimplifies the issue. The surviving assertion is more specific: the relevant information resides in the vision features, which the language side does not adequately utilize.
 
 ## What moved the needle
 
-### 1. More data
+After the formats plateaued, a separate agent reviewed my method and granted read-only access without drawing any conclusions. One-third of the "new family" test pages originated from two families that had no training pages at all. Since there was no scoring for the training pages, it appeared that memorization looked the same as not learning. I re-split the data by challenge, using a 75/25 ratio within every family. As a result, the test pages became **new puzzles from families that the model had already seen**. These numbers were compared with the old _seen_ scores (about 0.69), rather than the new-family score of 0.43. I also scored a fixed sample of 100 training pages during each epoch and switched to **plan-only** output: just the three lines and the action taken, without any written reasoning. The plan-only output matched the written formats, indicating that the reasoning text provided no additional benefit. After making these changes, the held-out score improved.
 
-![The same 310 held-out pages scored before and after more data](fig2-same-pages.png)
+Three changes moved the held-out score after that, in this order.
 
-Figure 2. The same 310 held-out pages, scored by runs before and after 287 newly recorded challenges. With the same recipe, the new data (g1) beat the old-data control by 18-21 pages at epochs 2-5. The combined recipe (g2) added about 40 more.
+![The same 310 held-out pages with old and new data, and all 397 held-out pages for g1, g2 and g3](fig-needle.png "Figure 5. (a) The same 310 held-out pages and the same plan-only recipe, trained on the old data and on more data. (b) All 397 held-out pages for g1 (more data), g2 (adds a decision-weighted loss, vision LoRA, a cosine schedule and shift/scale augmentation) and g3 (g2 plus a pointing head).")
 
-I recorded 287 more challenges. The new split kept every old held-out page held out, so old and new runs compare page for page. With the same recipe, g1 beat the old-data control at epochs 2, 3, 4 and 5 by 21, 19, 18 and 18 pages.
+**More data**. At this point, I had 1,082 usable challenges: 1,082 training pages and 397 held-out pages. Every challenge that had been held out before remained excluded, allowing for direct comparisons between old and new runs. The first run, labeled g1, applied the same recipe on the new data. On the 310 pages that both test sets shared, it correctly answered 18 to 21 more pages than the old data at every epoch from 2 to 5; the best scores compared were 223 against 211. Families that previously had no training pages now had some, and they began to improve: hexagon puzzles, for instance, grew from 5 correct answers out of 48 to 35, thanks to having 56 training pages instead of none. However, g1 proved unstable, with hexagon scores fluctuating between 5, 19, 31, 35, 25, 20, 38, and 13 across epochs, and the overall score shifted from 0.72 to 0.60 and back. A constant learning rate was too erratic for this data.
 
-It was also unstable. On hexagon pages, g1's last five epochs scored 35, 25, 20, 38 and 13 of 48. The model alternated between listing too few targets and too many. The training sample fell along with the held-out score, so this was not memorising. It was a constant learning rate.
+**A better loss, the eyes, a schedule.** G2 incorporated four changes simultaneously. The loss function assigned four times the weight to the decision (the Remaining list) compared to the bookkeeping the model copied from earlier lines. It used "soft" digit targets, where a coordinate 1 pixel off incurred less penalty than one 100 pixels off. The vision tower was also trained, this time at a learning rate of 1e-4. Additionally, the learning rate followed a cosine schedule, gradually decreasing to zero. Furthermore, half of the training images were resized and repositioned, with their coordinates adjusted accordingly, so the model could not rely on memorizing static placements. G2 steadily climbed to a score of 0.844 (335 correct out of 397), achieving the highest score of any write-it-out run, and letter drags increased from 12 to 17 out of 29. Since all four changes were made simultaneously, I cannot attribute the improvement to any single change.
 
-### 2. Put the loss where the decision is
+**A pointing head.** G3 introduced one small addition during training. It reads the image tokens halfway through the language model (layer 18) and learns to point at the patches clicked by the user. This mechanism is not used to provide answers; it simply offers the vision component a direct signal about patch locations. By epoch 4, G3 reached a score of 0.839, whereas G2 required epoch 7 to reach 0.844; this resulted in a tie, but G3 achieved it three epochs earlier. On held-out pages, the pointing mechanism identified the correct patch 97-98% of the time. G2 and G3 each successfully identified about 30 pages that the other missed, achieving a combined coverage of 364 out of 397 (92%). The model frequently knew the correct answer but did not always produce it.
 
-g2 changed four things at once:
-
-1. Vision LoRA at 1e-4, five times the earlier rate. This time the vision weights really moved.
-2. A decision-weighted loss. Each part of the completion is averaged on its own and weighted: the first-step plan ×2, the next action ×1, copies ×0.5, the answer ×0.5.
-3. Soft coordinate digits on the first step's `Remaining` line. A point a few pixels off is barely punished, and the exact human pixel is no longer worth memorising.
-4. Cosine learning-rate decay and shift/scale augmentation: half the pages shrunk to 80-100% and moved, every coordinate moved with them.
-
-The soft digits are small. Each coordinate digit's target is a Gaussian over the ten digits, wide for units, narrow for tens, and exact for hundreds. This is from the trainer, with the input check removed:
-
-```python
-def soft_digit_target(digit, sigma):
-    """The soft target over the ten digits for true digit ``digit``: q(k) ∝ exp(-(k - digit)² / 2σ²)."""
-    if sigma <= 0:
-        return [1.0 if k == digit else 0.0 for k in range(10)]
-    weights = [math.exp(-((k - digit) ** 2) / (2 * sigma * sigma)) for k in range(10)]
-    total = sum(weights)
-    return [weight / total for weight in weights]
-```
-
-The segment weighting is a per-part mean (excerpt from `decision_digit_losses`):
-
-```python
-for index, name in enumerate(DECISION_SEGMENTS):
-    part = (segments == index).to(per_token.dtype) * mask
-    total, count = (per_token * part).sum(-1), part.sum(-1)
-    losses = losses + weights[name] * total / count.clamp(min=1.0)
-```
-
-with `{"decision": 2.0, "next": 1.0, "copy": 0.5, "answer": 0.5}` and σ 2 for units, 0.5 for tens. Copied coordinates stay exact, because grading needs `Target` to equal an entry of `Remaining`.
-
-g2 rose steadily and stayed level: 0.630, 0.718, 0.793, 0.826, 0.834, 0.829, 0.844, 0.841. The swings were gone. Letter drags went from 1-2 of 9 in the old runs to 17 of 29.
-
-Because the four changes went in together, I do not know which did most. Finding out means dropping one at a time, about 12 hours each.
-
-### 3. A pointing loss for the eyes
-
-The vision tower only learned through the text loss. g3 adds a training-only head. It takes the language model's state at layer 18 for the last prompt token and scores every image token of the panel against it. The target is a soft bump on the patch grid at each human point. The head is two projections and a dot product (from the trainer):
-
-```python
-def pointer_scores(head, query, states):
-    """score_i = (W_q q) · (W_k k_i) / √dim, in float32, of one prompt's image tokens."""
-    query = _rms_normalised(query.float()) @ head["query"].T
-    keys = _rms_normalised(states.float()) @ head["key"].T
-    return keys @ query / math.sqrt(head["query"].shape[0])
-```
-
-The loss is the cross-entropy against the bumps, weighted 0.5. Its gradient reaches language layers 1-18, the merger and the vision tower. At inference nothing changes.
-
-The eyes learned to locate. By epoch 4, 97-98% of held-out targets were within one patch of the head's best guess. The plan did not follow.
-
-![Held-out first-step plan accuracy per epoch for five runs](fig3-heldout-curves.png)
-
-Figure 3. First-step plan right on the 397 held-out pages. g2, g3 and g4b peak at 335, 333 and 336: a one-to-three page spread. g3 got there faster (0.791 at epoch 2 against 0.718). g4c is at epoch 4 of 8.
-
-g3 peaked at 0.839 at epoch 4, two pages below g2. That is a tie. But the two models fail on different pages: each gets about 30 pages the other misses, and 364 of 397 (0.917) are right in at least one. The remaining errors are mostly which and how many targets to pick. Better eyes did not decide that.
-
-That is the point where a different readout started to look worth trying.
+One number never improved. On the 18 pages from the two families held out entirely, every run got between 2 and 10 right. So the model can handle some puzzles of a kind it has never seen, but none of these changes made it better at that: every gain above came on families it had trained on.
 
 ## The Jev idea
 
-Jev is TypeSafe's hosted decision model. You send a piece of text and a set of short questions (yes/no, pick one, a score). It reads the text once and answers every question from its hidden states, with calibrated probabilities and no generated text. Kev is Jared Palmer's open re-implementation ([github.com/jaredpalmer/kev](https://github.com/jaredpalmer/kev)), built from an outside reconstruction of Jev: a Qwen backbone, a LoRA adapter and a small pointer head.
+**Jev** is TypeSafe's hosted decision model. You send a piece of text and a set of short questions (yes/no, pick one, a score). It reads the text once and answers every question from its hidden states, with calibrated probabilities and no generated text. **Kev** is Jared Palmer's open re-implementation ([github.com/jaredpalmer/kev](https://github.com/jaredpalmer/kev)), built from an outside reconstruction of Jev: a Qwen backbone, a LoRA adapter and a small pointer head.
 
 Three ideas matter here:
 
-1. Read once. The shared input is processed one time and cached.
-2. Questions cannot see each other. Each question is a short branch that sees the shared input and its own tokens only, so adding a question does not change the others.
-3. Answers are probabilities, not text. The model can only pick from the options you give it.
+1. **Read once.** The shared input is processed one time and cached.
+2. **Questions cannot see each other.** Each question is a short branch that sees the shared input and its own tokens only, so adding a question does not change the others.
+3. **Answers are probabilities, not text.** The model can only pick from the options you give it.
 
 For a puzzle page, the shared input is the panel's image tokens plus the instruction and the previous actions. The questions become:
 
@@ -219,7 +188,7 @@ For a puzzle page, the shared input is the panel's image tokens plus the instruc
   └─ "Drop:"                pointer over patches: where it goes
 ```
 
-I made two choices that differ from Kev. The yes/no answer is read from the language model's own `" yes"` and `" no"` token logits, renormalised over the two, rather than a new head. And the written plan is still trained in the same run, so every readout is compared with it on the same pages.
+I made two choices that differ from Kev. The yes/no answer is read from the language model's _own_ `" yes"` and `" no"` token logits, renormalised over the two, rather than a new head. And the written plan is still trained in the same run, so every readout is compared with it on the same pages.
 
 The candidates differ by page type. A picture grid has nine fixed tile centres. A canvas uses the pointer head's 16 best peaks, spaced apart and refined to the centre of their local heat.
 
@@ -257,22 +226,22 @@ def _check_logprobs(policy, prefix, sequences, indices, verdicts, train):
 
 g4 is g3 plus the checks. After epoch 1, on the 242 held-out first steps whose plan is clicks:
 
-- Grids: checks 55 of 62, written plan 50.
-- Canvas: checks 95 of 180, written plan 146.
+- **Grids:** checks 55 of 62, written plan 50.
+- **Canvas:** checks 95 of 180, written plan 146.
 
-After epoch 2, grids were 59 of 62 for both. Canvas fell to 52 of 180, while the written plan rose to 154. On 114 of the 180 canvas pages the checks chose too many targets. Training checks were about 99% right.
+After epoch 2, grids were 59 of 62 for both. Canvas _fell_ to 52 of 180, while the written plan rose to 154. On 114 of the 180 canvas pages the checks chose too many targets. Training checks were about 99% right.
 
 ### A wrong diagnosis
 
-The first explanation was neat. In g4, a canvas training page got three kinds of candidates: the human's points with a little jitter (yes), raw head peaks (no) and random points (no). Each kind has its own coordinate pattern. So maybe the branches had learned to tell a candidate's source from its numbers, which is useless on held-out pages where every candidate is a refined peak. I built the fix: make training candidates exactly the way held-out ones are made.
+The first explanation was neat. In g4, a canvas training page got three kinds of candidates: the human's points with a little jitter (yes), raw head peaks (no) and random points (no). Each kind has its own coordinate pattern. So maybe the branches had learned to tell a candidate's _source_ from its numbers, which is useless on held-out pages where every candidate is a refined peak. I built the fix: make training candidates exactly the way held-out ones are made.
 
 Then I looked at where the wrong yeses actually were.
 
 ![Distance from wrongly passed candidates to the nearest target, and canvas pages right by epoch](fig4-rim-failure.png)
 
-Figure 4. (a) g4 at epoch 2: of 988 wrongly passed canvas candidates, 898 sat within 60 px of a real target, mostly 30-60 px away. Only 50 were more than 90 px away. (b) Canvas pages right. g4 used candidates 40 px apart and merged passing points within 45 px. g4b used 60 px spacing, left the rim band out of training and merged within 75 px.
+_Figure 4. (a) g4 at epoch 2: of 988 wrongly passed canvas candidates, 898 sat within 60 px of a real target, mostly 30-60 px away. Only 50 were more than 90 px away. (b) Canvas pages right. g4 used candidates 40 px apart and merged passing points within 45 px. g4b used 60 px spacing, left the rim band out of training and merged within 75 px._
 
-A source shortcut would produce yeses anywhere. These were not anywhere. Almost all were 30-60 px from a target: the edge of the same object. With candidates 40 px apart and passing points merged only within 45 px, one object gave two or three yeses, and each became a separate click. The model was not wrong that the object was a target. The readout counted it twice.
+A source shortcut would produce yeses anywhere. These were not anywhere. Almost all were 30-60 px from a target: the edge of the _same_ object. With candidates 40 px apart and passing points merged only within 45 px, one object gave two or three yeses, and each became a separate click. The model was not wrong that the object was a target. The readout counted it twice.
 
 Re-scoring g4's saved epoch-2 branches with only a 75 px merge lifts canvas from 52 to about 97 of 180, with no retraining.
 
@@ -324,7 +293,7 @@ After epoch 4 of 8, the count is right on 176 of 180 canvas pages (98%) but only
 
 ![Checks against the written plan on grids and canvas, and how often the checks pass the plan's points](fig5-checks-vs-written.png)
 
-Figure 5. (a, b) Checks against the written plan on the same held-out first steps. Grids: the checks match or beat the plan at every epoch, and g4c reaches 60 of 62. Canvas: the checks peak at 151 of 180 (g4b, epoch 4) while the plan holds 155-158 from epoch 4. (c) On g4b's epoch-7 checkpoint, the checks pass 398 of 399 of the plan's correct canvas points and 14 of its 19 wrong ones.
+_Figure 5. (a, b) Checks against the written plan on the same held-out first steps. Grids: the checks match or beat the plan at every epoch, and g4c reaches 60 of 62. Canvas: the checks peak at 151 of 180 (g4b, epoch 4) while the plan holds 155-158 from epoch 4. (c) On g4b's epoch-7 checkpoint, the checks pass 398 of 399 of the plan's correct canvas points and 14 of its 19 wrong ones._
 
 On picture grids the checks are level with or above the written plan at every epoch, 58 of 62 from epoch 4 on and 60 of 62 in g4c. A grid is the ideal case: nine fixed candidates, no localisation, one yes/no each.
 
@@ -340,7 +309,7 @@ So the yes/no readout and the written plan come from the same beliefs. When the 
 
 ![Grab and landing error distributions for drag where-questions](fig6-drag-errors.png)
 
-Figure 6. Drag "where" questions on 110 held-out single-drag pages (g4f, still training). (a) Grab error: 87 of 110 within the 30 px grab radius at epoch 1, 76 at epoch 2. (b) Landing error: 44 of 110 within 20 px at both epochs.
+_Figure 6. Drag "where" questions on 110 held-out single-drag pages (g4f, still training). (a) Grab error: 87 of 110 within the 30 px grab radius at epoch 1, 76 at epoch 2. (b) Landing error: 44 of 110 within 20 px at both epochs._
 
 A drop spot, like a faint hole, is hard to list as candidates in advance. So for drags g4f asks two pointer questions, `Piece:` and `Drop:`. Each is a short branch whose last token becomes the pointer head's query over every image patch (from the trainer, trimmed):
 
@@ -361,14 +330,14 @@ def _where_scores(policy, prefix, encoded, train):
 
 Partial results, epochs 1 and 2 of 8:
 
-|                                | Epoch 1        | Epoch 2        |
-| ------------------------------ | -------------- | -------------- |
-| Where questions right          | 43 / 110       | 39 / 110       |
-| Written plan right, same pages | 45 / 110       | 54 / 110       |
-| Either right                   | 64 / 110       | 61 / 110       |
-| Grab within 30 px              | 87 / 110 (79%) | 76 / 110 (69%) |
-| Landing within 20 px           | 44 / 110 (40%) | 44 / 110 (40%) |
-| Median grab / landing error    | 16 / 29 px     | 22 / 24 px     |
+|  | Epoch 1 | Epoch 2 |
+| --- | --- | --- |
+| Where questions right | 43 / 110 | 39 / 110 |
+| Written plan right, same pages | 45 / 110 | 54 / 110 |
+| Either right | 64 / 110 | 61 / 110 |
+| Grab within 30 px | 87 / 110 (79%) | 76 / 110 (69%) |
+| Landing within 20 px | 44 / 110 (40%) | 44 / 110 (40%) |
+| Median grab / landing error | 16 / 29 px | 22 / 24 px |
 
 The model usually finds the right piece. The landing is the bottleneck: the 20 px tolerance is smaller than one image token, which covers about 25 px of panel at this resolution. The two readouts fail on different pages, so combining them has room.
 
@@ -378,35 +347,35 @@ g4e adds a blurred copy of the panel as a second image, aimed at the faint lette
 
 ## Lessons
 
-1. Fix the scoreboard before tuning anything. For days the main number could not move: noise larger than any effect, a third of the pages unlearnable, no training-set eval. After the re-split and page-by-page comparisons, every later decision was readable.
-2. Format changes move which pages are right, not how many. Five formats, one ceiling. Plan-only matched them all.
-3. Data was the first real lever; loss placement was the second. Same recipe, more pages: +18 to +22 on identical pages. Then weighting the 12% of tokens that are the decision went with the jump to 0.844.
-4. The eyes saw more than the words used, but better eyes alone did not fix the plan. The pointing loss made localisation 97% right and left the plan level.
-5. A readout needs a notion of "one object". The first Jev version's yeses were mostly right about the object and wrong about the count, because one object offered three candidates.
-6. Check a diagnosis against the distribution before building the fix. The coordinate-shortcut story was plausible and had code behind it. One histogram ruled it out.
-7. A cleaner readout does not add knowledge. The checks inherit the written plan's beliefs, 398 of 399 and 14 of 19. They fix readout errors, not perception errors.
-8. What helps one page type can hurt another. The count question helps canvas and hurts grids. Per-type recipes beat one global rule.
-9. Bundled changes give results, not explanations. g2 worked, and I still cannot say why.
-10. A tie is a tie. 336, 335 and 333 of 397 are the same model quality.
+1. **Fix the scoreboard before tuning anything.** For days the main number could not move: noise larger than any effect, a third of the pages unlearnable, no training-set eval. After the re-split and page-by-page comparisons, every later decision was readable.
+2. **Format changes move which pages are right, not how many.** Five formats, one ceiling. Plan-only matched them all.
+3. **Data was the first real lever; loss placement was the second.** Same recipe, more pages: +18 to +22 on identical pages. Then weighting the 12% of tokens that are the decision went with the jump to 0.844.
+4. **The eyes saw more than the words used, but better eyes alone did not fix the plan.** The pointing loss made localisation 97% right and left the plan level.
+5. **A readout needs a notion of "one object".** The first Jev version's yeses were mostly right about the object and wrong about the count, because one object offered three candidates.
+6. **Check a diagnosis against the distribution before building the fix.** The coordinate-shortcut story was plausible and had code behind it. One histogram ruled it out.
+7. **A cleaner readout does not add knowledge.** The checks inherit the written plan's beliefs, 398 of 399 and 14 of 19. They fix readout errors, not perception errors.
+8. **What helps one page type can hurt another.** The count question helps canvas and hurts grids. Per-type recipes beat one global rule.
+9. **Bundled changes give results, not explanations.** g2 worked, and I still cannot say why.
+10. **A tie is a tie.** 336, 335 and 333 of 397 are the same model quality.
 
 ## What is next
 
-- Use each readout where it wins. Checks for grids, the written plan for canvas and boxes, and both for drags, since they fail on different pages (61-64 of 110 right in either).
-- Land drags more precisely. Refine around the drop peak at a finer scale than one patch.
-- A pick-one question. One softmax across all candidates, as Kev does for choice questions, for pages with exactly one answer.
-- A routing question, so the model says which recipe a page needs instead of me deciding.
-- Unseen families. 3-9 of 18 at best, across every run. This is the open problem, and none of the above targets it directly.
-- Seeds. Run-to-run variance is estimated by bootstrap, not measured with repeated seeds. Repeated seeds would turn the estimate into a measurement.
+- **Use each readout where it wins.** Checks for grids, the written plan for canvas and boxes, and both for drags, since they fail on different pages (61-64 of 110 right in either).
+- **Land drags more precisely.** Refine around the drop peak at a finer scale than one patch.
+- **A pick-one question.** One softmax across all candidates, as Kev does for choice questions, for pages with exactly one answer.
+- **A routing question,** so the model says which recipe a page needs instead of me deciding.
+- **Unseen families.** 3-9 of 18 at best, across every run. This is the open problem, and none of the above targets it directly.
+- **Seeds.** Run-to-run variance is estimated by bootstrap, not measured with repeated seeds. Repeated seeds would turn the estimate into a measurement.
 
 ## Mistakes worth admitting
 
-- The wrong diagnosis above. The fix for the wrong cause was already built and queued when the histogram showed the real one.
-- Calling a deficit real. g4b's written plan trailed g3 at epochs 1-2. I said it looked like interference from the checks. By epoch 3 the gap was gone (205 against 206 on the same pages).
-- A stale code copy. One run trained the wrong format with a too-short token cap, truncating about 30% of first steps. The review caught it.
-- Understated noise. I first quoted ±4 points. It is ±6-8.
-- A false gain. I claimed a drag improvement from 34% to 48% that compared different pages.
-- A misdescribed family. I called one held-out family unseen. It was the same hexagon puzzle as training pages.
-- An unwatched run. RL run 3 spent eight rollouts on NaN weights because its only watchdog had exited.
+- **The wrong diagnosis above.** The fix for the wrong cause was already built and queued when the histogram showed the real one.
+- **Calling a deficit real.** g4b's written plan trailed g3 at epochs 1-2. I said it looked like interference from the checks. By epoch 3 the gap was gone (205 against 206 on the same pages).
+- **A stale code copy.** One run trained the wrong format with a too-short token cap, truncating about 30% of first steps. The review caught it.
+- **Understated noise.** I first quoted ±4 points. It is ±6-8.
+- **A false gain.** I claimed a drag improvement from 34% to 48% that compared different pages.
+- **A misdescribed family.** I called one held-out family unseen. It was the same hexagon puzzle as training pages.
+- **An unwatched run.** RL run 3 spent eight rollouts on NaN weights because its only watchdog had exited.
 
 ## References
 
@@ -416,4 +385,4 @@ g4e adds a blurred copy of the panel as a second image, aimed at the faint lette
 - Shao et al., 2024. DeepSeekMath (GRPO). [arXiv:2402.03300](https://arxiv.org/abs/2402.03300).
 - Oquab et al., 2023. DINOv2. [arXiv:2304.07193](https://arxiv.org/abs/2304.07193).
 
-Figures: PNG at 2× and SVG. All numbers are pages right out of pages scored, from held-out pages no run trained on.
+_Figures: PNG at 2× and SVG. All numbers are pages right out of pages scored, from held-out pages no run trained on._

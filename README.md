@@ -12,6 +12,7 @@ The application lives in `web`.
   `web/app/blog` render the other pages inside the shared header and footer in
   `web/app/site-shell.tsx`. `web/app/globals.css` styles them.
 - `web/public/images` holds the profile photo and project images.
+- `web/editor` is the post editor, which exists only under `npm run dev`.
 
 Content sources and the list of excluded material are in
 [`docs/project-sources.md`](docs/project-sources.md).
@@ -22,15 +23,38 @@ Each post is one Markdown file in `web/content/blog`; the file name is the
 address (`my-post.md` is `/blog/my-post`). From `web`:
 
 ```sh
-npm run new-post -- "My post title"   # creates content/blog/my-post-title.md
-npm run dev                           # open http://localhost:3000/blog
+npm run dev   # open http://localhost:3000/blog
 ```
 
-Edit the file in any editor and save; the dev server restarts and the page
-reloads with your change. A new post starts with `draft: true` in its front
-matter. A draft appears only under `npm run dev` (marked "Draft"); builds leave
-out its page, its link, and its pictures. To publish, delete the `draft: true`
-line, then commit and push to `main`.
+A new post starts with `draft: true` in its front matter. A draft appears only
+under `npm run dev` (marked "Draft"); builds leave out its page, its link, and
+its pictures. To publish, untick Draft (or delete the `draft: true` line), then
+commit and push to `main`.
+
+### Editing on the page
+
+Under `npm run dev`, each post has an **Edit post** button, and the blog page
+has **Edit** links and a **New post** form. Click into the post and type: it
+saves to the Markdown file as you go, and **Done** shows the finished page.
+
+- Format with the toolbar or the usual keys: Ctrl+B, Ctrl+I, Ctrl+K (link),
+  Ctrl+Alt+2 and 3 (headings), Ctrl+Shift+8 and 7 (lists). Typing `## `, `- `,
+  `1. ` or `> ` at the start of a paragraph works too, and ` ``` ` then Enter
+  starts a code block.
+- Paste or drop a picture, or use **Image**. It is saved in
+  `web/public/images/blog/<post>/` and added as a figure; type its caption under
+  it.
+- Pasted text keeps its bold, italics, links, lists, and headings, including
+  from Google Docs. Ctrl+Shift+V pastes plain text.
+- Code blocks and tables open as Markdown when clicked. **Markdown** edits the
+  whole file, front matter included.
+- The date, draft setting, description, and thumbnail sit under the title.
+
+Only the paragraphs you change are rewritten; the rest of the file stays exactly
+as it was. If the file changes on disk while you edit, the editor asks before
+overwriting it. You can still edit the files in any editor (or create one with
+`npm run new-post -- "My post title"`); an open page updates when you save.
+None of the editor is in the built site.
 
 The top of a post is `title`, `date` (`YYYY-MM-DD`), an optional `description`
 for the blog list, and `draft: true` while it is unfinished. Posts are listed
@@ -39,7 +63,9 @@ newest first. Files whose names begin with an underscore, such as
 
 Write plain Markdown. Pictures go in `web/public/images/blog/my-post/` and are
 written by file name, `![Caption](chart.png)`; a picture alone on its line
-becomes a captioned figure. Headings get anchors, so `[results](#results)`
+becomes a captioned figure. For a caption longer than a short description, put
+it in quotes after the file name: `![Chart of X](chart.png "Figure 1. …")`
+shows the quoted text as the caption and keeps the alt text for screen readers. Headings get anchors, so `[results](#results)`
 jumps to `## Results`.
 
 ## Google Scholar embed
