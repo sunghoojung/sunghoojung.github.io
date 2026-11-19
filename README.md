@@ -68,6 +68,15 @@ it in quotes after the file name: `![Chart of X](chart.png "Figure 1. …")`
 shows the quoted text as the caption and keeps the alt text for screen readers. Headings get anchors, so `[results](#results)`
 jumps to `## Results`.
 
+Code blocks look like VS Code's editor: its Dark+ colors, from VS Code's own
+grammars through [Shiki](https://shiki.style), written into the page when it is
+built, so no script ships. Name the language after the opening fence, as in
+` ```python `. Python, JavaScript, TypeScript, TSX, JSON and shell (`bash`,
+`sh`) are colored and labeled with their language; a block in any other
+language, or with none, keeps the same dark style as plain text. To color
+another language, add its grammar to the highlighter in
+`web/app/blog/markdown.ts`.
+
 ## Google Scholar embed
 
 Google Scholar sends `X-Frame-Options: SAMEORIGIN`, so its pages cannot be
