@@ -174,12 +174,28 @@ test("blog lists each post and exports a page for it", () => {
     const post = read(`blog/${slug}.html`);
     assert.doesNotMatch(post, /<script\b/i, slug);
     assert.match(post, /<article class="post">/);
+    // A link to the post shares its own 1200×630 card.
+    assert.match(
+      post,
+      /<meta name="twitter:card" content="summary_large_image"/,
+    );
+    const card = post.match(
+      /<meta property="og:image" content="https:\/\/sunghoojung\.github\.io\/([^"]+)"/,
+    )?.[1];
+    assert.equal(card, `og/${slug}.png`, slug);
+    const png = readFileSync(new URL(card, out));
+    assert.deepEqual(
+      [png.readUInt32BE(16), png.readUInt32BE(20)],
+      [1200, 630],
+      `${card} is 1200×630`,
+    );
   }
   // Drafts are for `npm run dev` only: no page, no link, no pictures.
   for (const { slug } of draftFiles) {
     assert.ok(!pages.blog.includes(slug), `${slug} is not listed`);
     assert.ok(!existsSync(new URL(`blog/${slug}.html`, out)), slug);
     assert.ok(!existsSync(new URL(`images/blog/${slug}`, out)), slug);
+    assert.ok(!existsSync(new URL(`og/${slug}.png`, out)), slug);
   }
   // The template explains the format and must never be published.
   assert.ok(!existsSync(new URL("blog/_template.html", out)));

@@ -57,9 +57,14 @@ overwriting it. You can still edit the files in any editor (or create one with
 None of the editor is in the built site.
 
 The top of a post is `title`, `date` (`YYYY-MM-DD`), an optional `description`
-for the blog list, and `draft: true` while it is unfinished. Posts are listed
-newest first. Files whose names begin with an underscore, such as
-`_template.md`, are never published.
+for the blog list, an optional `thumbnail` (a picture's file name, shown on the
+blog list), and `draft: true` while it is unfinished. Posts are listed newest
+first. Files whose names begin with an underscore, such as `_template.md`, are
+never published.
+
+A link to a post shared on X, LinkedIn, Slack and the like shows a 1200×630
+card: the post's title beside its thumbnail. `npm run export` draws one per post
+into `web/out/og/` (`web/scripts/share-card.mjs`).
 
 Write plain Markdown. Pictures go in `web/public/images/blog/my-post/` and are
 written by file name, `![Caption](chart.png)`; a picture alone on its line
