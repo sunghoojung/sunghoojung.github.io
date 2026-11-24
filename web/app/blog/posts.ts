@@ -57,6 +57,12 @@ export const posts: Post[] = Object.entries(files)
   .filter((post) => import.meta.env.DEV || !post.draft)
   .sort((a, b) => b.date.localeCompare(a.date) || a.slug.localeCompare(b.slug));
 
+// The picture sites such as X show for a link to the post: its title beside its
+// thumbnail. scripts/export-static.mjs draws it (scripts/share-card.mjs).
+export function shareCardUrl(slug: string) {
+  return `/og/${slug}.png`;
+}
+
 export function formatDate(isoDate: string) {
   return new Date(`${isoDate}T00:00:00Z`).toLocaleDateString("en-US", {
     year: "numeric",

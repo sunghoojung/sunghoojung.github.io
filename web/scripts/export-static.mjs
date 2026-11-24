@@ -4,19 +4,47 @@
 // Every page is fixed text, so the exported HTML carries no scripts: pages are
 // rendered once here and linked with ordinary anchors.
 import { cp, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
+import {
+  frontMatterPattern,
+  readFrontMatter,
+} from "../app/blog/front-matter.ts";
+import { renderShareCard } from "./share-card.mjs";
 
 const root = new URL("../", import.meta.url);
 const out = new URL("out/", root);
 
 // Published posts only: no underscore prefix and no `draft: true`.
-const postSlugs = [];
+const posts = [];
 const draftSlugs = [];
 for (const name of await readdir(new URL("content/blog/", root))) {
   if (!name.endsWith(".md") || name.startsWith("_")) continue;
   const source = await readFile(new URL(`content/blog/${name}`, root), "utf8");
-  const frontMatter = source.match(/^---\r?\n([\s\S]*?)\r?\n---/)?.[1] ?? "";
+  const fields = readFrontMatter(source.match(frontMatterPattern)?.[1] ?? "");
   const slug = name.replace(/\.md$/, "");
-  (/^draft:\s*true\s*$/m.test(frontMatter) ? draftSlugs : postSlugs).push(slug);
+  if (fields.draft === "true") draftSlugs.push(slug);
+  else posts.push({ slug, fields });
+}
+const postSlugs = posts.map((post) => post.slug);
+
+// A post's thumbnail as posts.ts resolves it (pictureUrl in
+// app/blog/markdown.ts): a file name in the post's picture folder, a path in
+// public/, or a full URL, whose bytes are fetched.
+async function thumbnailSource(slug, thumbnail) {
+  if (!thumbnail) return undefined;
+  if (/^[a-z]+:/i.test(thumbnail)) {
+    const response = await fetch(thumbnail);
+    if (!response.ok) {
+      throw new Error(
+        `${slug}: thumbnail ${thumbnail} returned ${response.status}.`,
+      );
+    }
+    return Buffer.from(await response.arrayBuffer());
+  }
+  const path = thumbnail.startsWith("/")
+    ? thumbnail
+    : `/images/blog/${slug}/${thumbnail}`;
+  return fileURLToPath(new URL(`public${path}`, root));
 }
 
 // GitHub Pages serves projects.html at /projects. The blog list is written
@@ -86,7 +114,21 @@ for (const page of pages) {
   }
 }
 
+// Each post's share card, where its og:image points (shareCardUrl in
+// app/blog/posts.ts).
+await mkdir(new URL("og/", out), { recursive: true });
+for (const { slug, fields } of posts) {
+  const card = await renderShareCard({
+    title: fields.title,
+    date: fields.date,
+    thumbnail: await thumbnailSource(slug, fields.thumbnail),
+  });
+  await writeFile(new URL(`og/${slug}.png`, out), card);
+}
+
 // Serve the files as they are, including paths that begin with an underscore.
 await writeFile(new URL(".nojekyll", out), "");
-console.log(`Exported ${pages.length} pages to out/.`);
+console.log(
+  `Exported ${pages.length} pages and ${posts.length} share card${posts.length === 1 ? "" : "s"} to out/.`,
+);
 process.exit(0);

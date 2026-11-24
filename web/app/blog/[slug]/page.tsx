@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { profile } from "../../content";
 import { SiteShell } from "../../site-shell";
-import { formatDate, posts } from "../posts";
+import { formatDate, posts, shareCardUrl } from "../posts";
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -14,10 +14,33 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const post = posts.find((item) => item.slug === slug);
   if (!post) return {};
+  const card = {
+    url: shareCardUrl(post.slug),
+    width: 1200,
+    height: 630,
+    alt: post.title,
+  };
   return {
     title: `${post.title} | ${profile.name}`,
     description: post.description,
     alternates: { canonical: `/blog/${post.slug}` },
+    // What X, LinkedIn, Slack and the like show for a link to the post.
+    openGraph: {
+      type: "article",
+      title: post.title,
+      description: post.description,
+      url: `/blog/${post.slug}`,
+      siteName: profile.name,
+      publishedTime: post.date,
+      authors: [profile.name],
+      images: [card],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: post.title,
+      description: post.description,
+      images: [card],
+    },
   };
 }
 
