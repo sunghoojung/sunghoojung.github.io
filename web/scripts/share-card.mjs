@@ -16,11 +16,9 @@ const colors = {
   text: "#1a1a1a",
   muted: "#6b6b6b",
   rule: "#e5e5e5",
-  accent: "#1f6fd0",
 };
-// profile.name in app/content.ts, and the site's address.
+// profile.name in app/content.ts.
 const author = "Sunghoo Jung";
-const site = "sunghoojung.github.io";
 const padding = 64;
 const gap = 56;
 // The largest the thumbnail is drawn. It keeps its own shape inside.
@@ -98,14 +96,8 @@ export async function renderShareCard({ title, date, thumbnail }) {
       },
       h(
         "div",
-        { style: { display: "flex", gap: 14, fontSize: 26, fontWeight: 600 } },
-        h("span", { style: { color: colors.accent } }, "Blog"),
-        h("span", { style: { color: colors.muted } }, "·"),
-        h(
-          "span",
-          { style: { color: colors.muted, fontWeight: 400 } },
-          formatDate(date),
-        ),
+        { style: { fontSize: 26, color: colors.muted } },
+        formatDate(date),
       ),
       h(
         "div",
@@ -121,12 +113,7 @@ export async function renderShareCard({ title, date, thumbnail }) {
         },
         title,
       ),
-      h(
-        "div",
-        { style: { display: "flex", gap: 14, fontSize: 26 } },
-        h("span", { style: { fontWeight: 600 } }, author),
-        h("span", { style: { color: colors.muted } }, site),
-      ),
+      h("div", { style: { fontSize: 26, fontWeight: 600 } }, author),
     ),
     image &&
       h("img", {
