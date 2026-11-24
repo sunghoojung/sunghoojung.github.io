@@ -120,7 +120,6 @@ await mkdir(new URL("og/", out), { recursive: true });
 for (const { slug, fields } of posts) {
   const card = await renderShareCard({
     title: fields.title,
-    date: fields.date,
     thumbnail: await thumbnailSource(slug, fields.thumbnail),
   });
   await writeFile(new URL(`og/${slug}.png`, out), card);

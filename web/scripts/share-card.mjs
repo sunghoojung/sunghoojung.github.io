@@ -14,7 +14,6 @@ export const cardSize = { width: 1200, height: 630 };
 const colors = {
   background: "#f5f5f5",
   text: "#1a1a1a",
-  muted: "#6b6b6b",
   rule: "#e5e5e5",
 };
 // profile.name in app/content.ts.
@@ -56,18 +55,9 @@ async function picture(source) {
   };
 }
 
-function formatDate(isoDate) {
-  return new Date(`${isoDate}T00:00:00Z`).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    timeZone: "UTC",
-  });
-}
-
 // `thumbnail` is a path on disk or the picture's bytes; without one, the title
 // has the card to itself. Returns the PNG's bytes.
-export async function renderShareCard({ title, date, thumbnail }) {
+export async function renderShareCard({ title, thumbnail }) {
   const image = thumbnail ? await picture(thumbnail) : null;
   const card = h(
     "div",
@@ -94,11 +84,6 @@ export async function renderShareCard({ title, date, thumbnail }) {
           gap: 28,
         },
       },
-      h(
-        "div",
-        { style: { fontSize: 26, color: colors.muted } },
-        formatDate(date),
-      ),
       h(
         "div",
         {
