@@ -58,34 +58,20 @@ export const publications = [
 export type Project = {
   id: string;
   title: string;
-  // One line, at a high level.
+  // A short phrase that keeps the whole entry on one line.
   summary: string;
-  image: {
-    src: string;
-    alt: string;
-    width: number;
-    height: number;
-    // Which part of the image stays in view when it is cropped to the card.
-    position?: string;
-  };
-  links: { label: string; href: string }[];
+  // Shown before the title, as [devpost] [github].
+  links: { label: "devpost" | "github"; href: string }[];
 };
 
 export const projects: Project[] = [
   {
     id: "reverse-engineering-browser",
     title: "Reverse Engineering Browser",
-    summary:
-      "A custom Brave browser and macOS app that traces how a web application works, from a network request back to the code behind it.",
-    image: {
-      src: "/images/projects/browser-app.webp",
-      alt: "Origin Trace desktop app showing a captured request to example.com with its timeline and details.",
-      width: 1200,
-      height: 754,
-    },
+    summary: "A Brave build and Mac app that trace requests to their code",
     links: [
       {
-        label: "Repository",
+        label: "github",
         href: "https://github.com/sunghoojung/reverse-engineering-browser",
       },
     ],
@@ -93,51 +79,58 @@ export const projects: Project[] = [
   {
     id: "astra",
     title: "Astra NFT Bot",
-    summary:
-      "An automated NFT purchasing bot built by a team of six, for which I wrote the Go backend.",
-    image: {
-      src: "/images/projects/astra-dashboard.webp",
-      alt: "Astra NFT Sniper desktop dashboard showing its task list and controls.",
-      width: 1200,
-      height: 664,
-    },
+    summary: "An NFT purchasing bot from a team of six; I wrote the Go backend",
     links: [],
   },
   {
     id: "lifesaver",
     title: "LifeSaver",
     summary:
-      "A browser-based surgical training simulator with AI voice guidance, placed 2nd overall at YHack 2026.",
-    image: {
-      src: "/images/projects/lifesaver.webp",
-      alt: "LifeSaver's 3D operating room with a patient model, surgical instruments, and a virtual doctor.",
-      width: 1200,
-      height: 573,
-    },
+      "A surgical training simulator with AI voice guidance, 2nd at YHack 2026",
     links: [
       {
-        label: "Devpost",
+        label: "devpost",
         href: "https://devpost.com/software/lifesaver-lnm0tz",
       },
-      { label: "Repository", href: "https://github.com/akhilm2223/yale" },
+      { label: "github", href: "https://github.com/akhilm2223/yale" },
     ],
   },
   {
     id: "microscopy",
     title: "Alpha-synuclein Analysis",
     summary:
-      "A microscopy pipeline that segments inclusions inside cells and classifies their shape.",
-    image: {
-      src: "/images/projects/microscopy.webp",
-      alt: "Microscopy image of a cell with four inclusions marked red and one marked green.",
-      width: 766,
-      height: 766,
-      position: "center 68%",
-    },
+      "A microscopy pipeline that segments and classifies cell inclusions",
     links: [
       {
-        label: "Repository",
+        label: "github",
         href: "https://github.com/sunghoojung/segment-classify-pipeline",
+      },
+    ],
+  },
+  {
+    id: "crime-tracker",
+    title: "New Brunswick Crime Tracker",
+    summary: "A crime map with safe walking routes, won at HackRU",
+    links: [
+      {
+        label: "devpost",
+        href: "https://devpost.com/software/new-brunswick-crime-tracker",
+      },
+      {
+        label: "github",
+        href: "https://github.com/sunghoojung/crime_lookup_nb",
+      },
+    ],
+  },
+  {
+    id: "opensea-monitor",
+    title: "OpenSea Monitor",
+    summary:
+      "A cache bypass I found let it see listings faster and made me $100,000",
+    links: [
+      {
+        label: "github",
+        href: "https://github.com/sunghoojung/openseamonitor",
       },
     ],
   },
