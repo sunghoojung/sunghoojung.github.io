@@ -35,12 +35,15 @@ The Google Scholar frame shows a saved copy of the profile; see the README.
 
 ## Projects
 
-Each project has one high-level line and one image.
+Each project is one line: its links as `[devpost]` and `[github]`, its name,
+and a short phrase.
 
 - **Reverse Engineering Browser:** the public [repository](https://github.com/sunghoojung/reverse-engineering-browser) and its README.
 - **Astra NFT Bot:** `Sunghoo_Jung.tex` in the user's resume repository, for the team size and the Go backend role.
 - **LifeSaver:** the team's [Devpost submission](https://devpost.com/software/lifesaver-lnm0tz) and [repository](https://github.com/akhilm2223/yale). The placement follows Devpost.
 - **Alpha-synuclein Analysis:** the resume and the public [segment-classify-pipeline repository](https://github.com/sunghoojung/segment-classify-pipeline).
+- **New Brunswick Crime Tracker:** the team's [Devpost submission](https://devpost.com/software/new-brunswick-crime-tracker) and [repository](https://github.com/sunghoojung/crime_lookup_nb). It won the Social Good Track at HackRU Fall 2025, per Devpost.
+- **OpenSea Monitor:** the public [repository](https://github.com/sunghoojung/openseamonitor), whose requests vary a query parameter so OpenSea's Cloudflare cache never answers them. The $100,000 it made is as stated by the site owner (2026-11-24).
 
 The AI Video Detector, Neo Seoul, and Prosthetic Hand were removed from the
 list at the site owner's request.
@@ -50,10 +53,9 @@ list at the site owner's request.
 Images are local, in `web/public/images`, converted to WebP and resized to at
 most 1200 pixels wide.
 
-| Asset                           | Origin                                                                                                                                                    |
-| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `sunghoo-jung.webp`             | Profile photo supplied by the site owner on 2026-11-12                                                                                                    |
-| `projects/browser-app.webp`     | Origin Trace app screenshot captured locally in a metadata-only session using example.com on 2026-09-24                                                   |
-| `projects/astra-dashboard.webp` | Screenshot of Astra NFT Sniper v2.2.7, supplied by the site owner on 2026-09-24                                                                           |
-| `projects/lifesaver.webp`       | `image.png` in [akhilm2223/yale](https://github.com/akhilm2223/yale/blob/main/image.png)                                                                  |
-| `projects/microscopy.webp`      | Final overlay from the public [example notebook](https://github.com/sunghoojung/segment-classify-pipeline/blob/master/example.ipynb), cropped to the plot |
+| Asset               | Origin                                                 |
+| ------------------- | ------------------------------------------------------ |
+| `sunghoo-jung.webp` | Profile photo supplied by the site owner on 2026-11-12 |
+
+The project screenshots were removed on 2026-11-24, when the Projects page
+became a list.

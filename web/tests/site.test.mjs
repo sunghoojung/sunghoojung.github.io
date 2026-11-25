@@ -138,29 +138,35 @@ test("Google Scholar is framed from a saved, inert copy", () => {
   );
 });
 
-test("each project has an image, a heading, and a one-line summary", () => {
+test("each project is one line: its links, its name, and a short phrase", () => {
   const html = pages.projects;
   assert.match(html, /<h1>Projects<\/h1>/);
-  const articles = [
-    ...html.matchAll(/<article\b[^>]*>[\s\S]*?<\/article>/g),
-  ].map(([article]) => article);
-  assert.equal(articles.length, 4);
-  for (const article of articles) {
-    const heading = article.match(/aria-labelledby="([^"]+)"/)?.[1];
-    assert.ok(heading);
-    assert.ok(article.includes(`id="${heading}"`));
-    const image = article.match(/<img\b[^>]*>/)?.[0];
-    assert.ok(image);
-    assert.match(image, /alt="[^"]{20,}"/);
-    assert.match(image, /width="[1-9]\d*"/);
-    assert.match(image, /height="[1-9]\d*"/);
-    const summary = article.match(/<p>([^<]+)<\/p>/)?.[1];
-    assert.ok(summary, "has a summary");
-    assert.ok(summary.length <= 140, `summary stays one line: ${summary}`);
-    assert.equal(summary.match(/\.(\s|$)/g)?.length, 1, "one sentence");
+  const items = [...html.matchAll(/<li id="([^"]+)">([\s\S]*?)<\/li>/g)].map(
+    ([, id, item]) => ({ id, item }),
+  );
+  assert.equal(items.length, 6);
+  for (const { id, item } of items) {
+    const [tags, rest] = item.split('<strong class="project-title">');
+    assert.ok(rest, `${id} has a title`);
+    for (const [, href, label] of tags.matchAll(
+      /\[<a href="([^"]+)"[^>]*>([^<]+)<\/a>\]/g,
+    )) {
+      assert.equal(new URL(href).hostname, `${label}.com`, `${id}: ${label}`);
+    }
+    const [title, summary] = rest.split("</strong>\u00a0- ");
+    assert.ok(summary, `${id}: a no-break space joins the dash to the title`);
+    // Lines of 100 to 102 characters fill about 93% of the 832px column,
+    // leaving room for system fonts wider than the one measured.
+    const text = `${tags.replace(/<[^>]+>/g, "")}${title} - ${summary}`;
+    assert.ok(text.length <= 102, `stays one line: ${text}`);
+    assert.doesNotMatch(summary, /[.<]/, `${id}: one plain phrase`);
   }
-  assert.match(html, /Reverse Engineering Browser/);
+  // The About page links to /projects#reverse-engineering-browser.
+  assert.ok(items.some(({ id }) => id === "reverse-engineering-browser"));
   assert.match(html, /Astra NFT Bot/);
+  assert.match(html, /New Brunswick Crime Tracker/);
+  assert.match(html, /OpenSea Monitor/);
+  assert.match(html, /\$100,000/);
 });
 
 test("blog lists each post and exports a page for it", () => {
